@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -14,9 +15,20 @@ import { format } from 'date-fns';
 import { cn } from "@/lib/utils";
 import type { Task, Priority, Comment, Attachment, UserRole, AppUser } from '@/lib/types'; // Import AppUser
 import { useFirebase } from '@/components/providers/firebase-provider';
-import { doc, updateDoc, Timestamp, arrayUnion, arrayRemove, collection, getDocs, query } from 'firebase/firestore'; // Simplified imports
+import { doc, updateDoc, Timestamp, arrayUnion, arrayRemove, collection, getDocs, query, deleteDoc } from 'firebase/firestore'; // Added deleteDoc
 import { useToast } from '@/hooks/use-toast';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'; // Firebase Storage
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog" // Import AlertDialog components
 
 interface TaskDetailModalProps {
   isOpen: boolean;
@@ -48,6 +60,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
   const [attachments, setAttachments] = useState<Attachment[]>(task.attachments || []);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false); // State for delete operation
   const [assigneeOptions, setAssigneeOptions] = useState<AssigneeOption[]>([]); // State for assignee dropdown
 
    // Fetch potential assignees (users) when the modal opens or user role allows
@@ -84,7 +97,10 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
     setComments(task.comments || []); // Reset comments
     setAttachments(task.attachments || []); // Reset attachments
     setNewComment(''); // Clear comment input
-  }, [task]);
+    setIsSaving(false); // Reset saving state
+    setIsUploading(false); // Reset uploading state
+    setIsDeleting(false); // Reset deleting state
+  }, [task, isOpen]); // Add isOpen to ensure reset on modal re-open
 
   const isEditable = (fieldName: keyof Task): boolean => {
     if (!userRole) return false;
@@ -309,6 +325,34 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
     }
   };
 
+
+   const handleDeleteTask = async () => {
+    if (!db || !task || !user || (userRole !== 'manager' && userRole !== 'owner')) {
+      toast({ title: "Permission Denied", description: "You do not have permission to delete this task.", variant: "destructive" });
+      return;
+    }
+
+    setIsDeleting(true);
+    const taskRef = doc(db, 'tasks', task.id);
+
+    // TODO: Delete associated storage attachments if necessary
+    // This requires listing files in the storage folder and deleting them individually.
+    // const attachmentsFolderRef = ref(storage, `attachments/${task.projectId}/${task.id}`);
+    // Consider implementing this if orphaned files are a concern.
+
+    try {
+      await deleteDoc(taskRef);
+      toast({ title: "Task Deleted", description: `Task "${task.name}" was successfully deleted.` });
+      onClose(); // Close the modal after deletion
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      toast({ title: "Error", description: "Failed to delete task.", variant: "destructive" });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+
   // Determine the current value for a field, prioritizing edited value
    const getCurrentValue = (fieldName: keyof Task) => {
     // Use nullish coalescing for cleaner fallback
@@ -331,7 +375,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
               onChange={handleInputChange}
               className="text-lg font-semibold"
               placeholder="Task Name"
-              disabled={!isEditable('name') || isSaving}
+              disabled={!isEditable('name') || isSaving || isDeleting}
             />
           ) : (
             <span className="text-lg font-semibold">{task.name}</span>
@@ -352,7 +396,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                     name="assigneeId"
                     value={(getCurrentValue('assigneeId') as string) || 'unassigned'} // Default to 'unassigned' if null/undefined
                     onValueChange={(value) => handleSelectChange('assigneeId', value === 'unassigned' ? null : value)}
-                    disabled={!isEditable('assigneeId') || isSaving}
+                    disabled={!isEditable('assigneeId') || isSaving || isDeleting}
                   >
                    <SelectTrigger id="assigneeId">
                      <SelectValue placeholder="Select Assignee" />
@@ -380,7 +424,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                   name="priority"
                   value={getCurrentValue('priority') || 'Medium'}
                   onValueChange={(value) => handleSelectChange('priority', value as Priority)}
-                  disabled={!isEditable('priority') || isSaving}
+                  disabled={!isEditable('priority') || isSaving || isDeleting}
                 >
                   <SelectTrigger id="priority">
                     <SelectValue placeholder="Select Priority" />
@@ -411,7 +455,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                       "w-full justify-start text-left font-normal",
                       !displayDueDate && "text-muted-foreground"
                     )}
-                    disabled={!isEditable('dueDate') || isSaving}
+                    disabled={!isEditable('dueDate') || isSaving || isDeleting}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {displayDueDate ? format(displayDueDate, 'PPP') : <span>Pick a date</span>}
@@ -446,7 +490,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                     <span className="truncate">{att.fileName}</span>
                   </a>
                    { (userRole === 'manager' || userRole === 'owner' || att.userId === user?.uid) && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteAttachment(att)} disabled={isSaving || isUploading}>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteAttachment(att)} disabled={isSaving || isUploading || isDeleting}>
                            <Trash2 className="w-4 h-4" />
                          </Button>
                       )}
@@ -461,7 +505,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                      id="attachment-upload"
                      type="file"
                      onChange={handleFileChange}
-                     disabled={isUploading || isSaving}
+                     disabled={isUploading || isSaving || isDeleting}
                      className="text-sm"
                    />
                    {isUploading && <p className="text-xs text-muted-foreground mt-1">Uploading...</p>}
@@ -490,10 +534,10 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                      value={newComment}
                      onChange={(e) => setNewComment(e.target.value)}
                      rows={2}
-                     disabled={isSaving || isUploading}
+                     disabled={isSaving || isUploading || isDeleting}
                      className="flex-grow"
                    />
-                   <Button onClick={handleAddComment} disabled={!newComment.trim() || isSaving || isUploading} size="icon">
+                   <Button onClick={handleAddComment} disabled={!newComment.trim() || isSaving || isUploading || isDeleting} size="icon">
                      <Send className="w-4 h-4" />
                    </Button>
                  </div>
@@ -502,16 +546,52 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
         </div>
 
         {/* Footer with Actions */}
-        <DialogFooter className="pt-4 border-t">
-          <DialogClose asChild>
-            <Button variant="outline" disabled={isSaving || isUploading}>Cancel</Button>
-          </DialogClose>
-          {/* Only show Save Changes if user can edit *something* other than comments/attachments */}
-           {(userRole === 'manager' || userRole === 'owner') && (
-            <Button onClick={handleSaveChanges} disabled={isSaving || isUploading || !Object.keys(editedTask).some(key => isEditable(key as keyof Task))}>
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </Button>
-           )}
+        <DialogFooter className="pt-4 border-t flex justify-between">
+          {/* Left side: Delete button (Managers/Owners only) */}
+          <div>
+            {(userRole === 'manager' || userRole === 'owner') && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                   <Button variant="destructive" disabled={isSaving || isUploading || isDeleting}>
+                     <Trash2 className="w-4 h-4 mr-2" />
+                     Delete Task
+                   </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete the task
+                      "{task.name}". Associated comments and attachments might also be removed (depending on storage rules).
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                       onClick={handleDeleteTask}
+                       disabled={isDeleting}
+                       className={buttonVariants({ variant: "destructive" })} // Ensure destructive style
+                     >
+                      {isDeleting ? 'Deleting...' : 'Delete Task'}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
+
+          {/* Right side: Cancel and Save buttons */}
+          <div className="flex space-x-2">
+            <DialogClose asChild>
+              <Button variant="outline" disabled={isSaving || isUploading || isDeleting}>Cancel</Button>
+            </DialogClose>
+            {/* Only show Save Changes if user can edit *something* other than comments/attachments */}
+             {(userRole === 'manager' || userRole === 'owner') && (
+              <Button onClick={handleSaveChanges} disabled={isSaving || isUploading || isDeleting || !Object.keys(editedTask).some(key => isEditable(key as keyof Task))}>
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </Button>
+             )}
+           </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
