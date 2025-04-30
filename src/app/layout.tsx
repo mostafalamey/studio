@@ -23,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning={true}> {/* Add suppressHydrationWarning here */}
       <body className={`${inter.variable} font-sans antialiased`}> {/* Use Inter font */}
         <FirebaseProvider>
           <SidebarProvider defaultOpen={true}> {/* Wrap with SidebarProvider */}
