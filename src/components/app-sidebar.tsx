@@ -273,42 +273,9 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
          </SidebarGroup>
       </SidebarContent>
 
-       {/* Footer with User Info - Removed Separator */}
-      {/* <SidebarSeparator /> */}
-
+       {/* Footer - Removed User Info and Logout */}
       <SidebarFooter className="p-2 mt-auto border-t border-sidebar-border">
-        {authLoading ? (
-           <div className="flex items-center gap-2 p-2">
-                <Skeleton className="h-8 w-8 rounded-full" />
-                <div className="flex-1 space-y-1 group-data-[collapsible=icon]:hidden">
-                   <Skeleton className="h-4 w-3/4" />
-                   <Skeleton className="h-3 w-1/2" />
-                </div>
-           </div>
-        ) : user ? (
-          <div className="flex items-center gap-2 p-2 group-data-[collapsible=icon]:justify-center">
-            {/* Simplified footer - Avatar and Logout only when collapsed */}
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={user.photoURL || undefined} alt={user.displayName || user.email || 'User'}/>
-              <AvatarFallback className="bg-muted text-muted-foreground text-xs">
-                {getInitials(user.displayName || user.email)}
-              </AvatarFallback>
-            </Avatar>
-            {/* Expanded view details removed as per header */}
-            {/* <div className="flex-grow overflow-hidden group-data-[collapsible=icon]:hidden">
-              <p className="text-sm font-medium truncate">{user.displayName || user.email}</p>
-              <p className="text-xs text-muted-foreground capitalize">{userRole || 'Loading role...'}</p>
-            </div> */}
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10 group-data-[collapsible=icon]:ml-0 ml-auto" onClick={handleLogout} title="Logout">
-                <LogOut className="w-4 h-4" />
-             </Button>
-
-          </div>
-        ) : (
-          <div className="p-2 text-sm text-muted-foreground group-data-[collapsible=icon]:hidden">
-            Not logged in.
-          </div>
-        )}
+         {/* Content removed as per request */}
       </SidebarFooter>
     </Sidebar>
   );
