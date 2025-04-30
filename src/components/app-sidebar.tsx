@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton component
 
 
 // Define props if sidebar needs external control, e.g., selected project ID
