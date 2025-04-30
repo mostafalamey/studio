@@ -1,4 +1,4 @@
-import type {Metadata} from 'next';
+import type { Metadata } from 'next';
 import { Inter } from 'next/font/google'; // Use Inter font
 import './globals.css';
 import { FirebaseProvider } from '@/components/providers/firebase-provider';
@@ -23,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning={true}> {/* Add suppressHydrationWarning here */}
+    <html lang="en" suppressHydrationWarning={true}>{/* Add suppressHydrationWarning here */}
       <body className={`${inter.variable} font-sans antialiased`}> {/* Use Inter font */}
         <FirebaseProvider>
           <SidebarProvider defaultOpen={true}> {/* Wrap with SidebarProvider */}
