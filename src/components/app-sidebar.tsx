@@ -48,6 +48,7 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectDescription, setNewProjectDescription] = useState('');
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
+  // Use context for selectedProjectId state
   const { selectedProjectId, setSelectedProjectId } = useProjectContext();
 
    // --- Project Fetching Logic ---
@@ -79,13 +80,7 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
    });
 
 
-   // Auto-select first project logic
-   React.useEffect(() => {
-    if (selectedProjectId === null && !projectsLoading && projects && projects.length > 0) {
-      setSelectedProjectId(projects[0].id);
-    }
-     // Add a dependency on projects to re-run if the project list changes and no project is selected
-  }, [projects, projectsLoading, selectedProjectId, setSelectedProjectId]);
+   // Removed redundant auto-select useEffect - handled in page.tsx
 
 
    const handleSelectProject = (projectId: string) => {
@@ -99,7 +94,7 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
     try {
       await auth.signOut();
       toast({ title: "Logged Out", description: "You have been successfully logged out." });
-      setSelectedProjectId(null);
+      setSelectedProjectId(null); // Clear selected project on logout
     } catch (error) {
       console.error("Logout error:", error);
       toast({ title: "Logout Failed", variant: "destructive" });
@@ -276,3 +271,4 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
 };
 
 export default AppSidebar;
+

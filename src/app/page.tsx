@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -8,10 +9,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useCollectionData } from 'react-firebase-hooks/firestore';
 import { collection, query, orderBy, where, FirestoreError, CollectionReference, Query } from 'firebase/firestore';
 import type { Project } from '@/lib/types'; // Ensure Project type is imported
+import { useProjectContext } from '@/components/providers/project-provider'; // Import project context
 
 export default function Home() {
   const { user, loading, db, userRole } = useFirebase();
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  // Get selectedProjectId and setSelectedProjectId from context
+  const { selectedProjectId, setSelectedProjectId } = useProjectContext();
 
   // Conditionally define the query based on user role
   let projectsQuery: Query | CollectionReference | null = null;
@@ -23,10 +26,7 @@ export default function Home() {
     } else if (userRole === 'employee' && user) {
        // Placeholder: Employees might see projects they are assigned tasks in.
        // This requires a more complex query or data structure modification (e.g., adding user IDs to projects).
-       // For now, let's show no projects, or adjust based on specific requirements.
-       // Option 1: Show no projects by default for employees
-       // projectsQuery = query(projectsCollection, where('__name__', '==', 'nonexistent')); // Query that returns nothing
-       // Option 2: Show all projects (temporary, adjust later)
+       // For now, let's show all projects for simplicity.
        projectsQuery = query(projectsCollection, orderBy('createdAt', 'desc'));
     } else {
       // No user or role, or invalid role
@@ -42,17 +42,13 @@ export default function Home() {
 
    // Automatically select the first project if none is selected and projects load
    useEffect(() => {
-    if (!selectedProjectId && projects && projects.length > 0) {
-      setSelectedProjectId(projects[0].id);
+    if (selectedProjectId === null && !projectsLoading && projects && projects.length > 0) {
+        setSelectedProjectId(projects[0].id);
     }
-  }, [projects, selectedProjectId]);
+    // Add setSelectedProjectId to the dependency array
+}, [projects, projectsLoading, selectedProjectId, setSelectedProjectId]);
 
-   // Handle project selection from sidebar (passed via context or prop drilling if needed)
-   // This function would typically be passed down to the sidebar.
-   // For simplicity here, we'll assume the sidebar can update this state.
-   const handleSelectProject = (projectId: string) => {
-     setSelectedProjectId(projectId);
-   };
+   // Project selection is handled by the sidebar via context
 
 
   if (loading || projectsLoading) {
@@ -112,3 +108,4 @@ export default function Home() {
      </>
   );
 }
+
