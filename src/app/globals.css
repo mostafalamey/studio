@@ -8,44 +8,53 @@ body {
 
 @layer base {
   :root {
-    /* Updated Light Theme based on user request */
-    --background: 216 100% 95.5%; /* Soft Blue #E9F2FF */
+    /* Updated Light Theme based on image */
+    --background: 220 30% 96%; /* Light Grayish Blue #F0F4F8 */
     --foreground: 217 55% 20%;   /* Dark Gray #172B4D */
     --card: 0 0% 100%;            /* White */
     --card-foreground: 217 55% 20%; /* Dark Gray #172B4D */
     --popover: 0 0% 100%;         /* White */
     --popover-foreground: 217 55% 20%; /* Dark Gray #172B4D */
-    --primary: 210 100% 40%;      /* Vibrant Blue #0052CC */
+    --primary: 221 83% 53%;      /* Vibrant Blue #3B82F6 */
     --primary-foreground: 0 0% 98%; /* Near White */
-    --secondary: 220 13% 96%;     /* Light Gray #F4F5F7 */
+    --secondary: 220 13% 96%;     /* Light Gray #F4F5F7 (Used for column bg) */
     --secondary-foreground: 217 55% 20%; /* Dark Gray #172B4D */
     --muted: 220 13% 96%;         /* Light Gray #F4F5F7 */
     --muted-foreground: 220 10% 40%; /* Adjusted Muted Gray */
-    --accent: 210 100% 90%;       /* Lighter Primary Blue for hover/active */
-    --accent-foreground: 210 100% 40%; /* Vibrant Blue #0052CC */
-    --destructive: 13 89% 45%;    /* Red #DE350B */
+    --accent: 220 100% 95%;       /* Lighter Primary Blue for hover/active #EBF5FF */
+    --accent-foreground: 221 83% 53%; /* Vibrant Blue #3B82F6 */
+    --destructive: 0 72% 51%;    /* Red #DE3B40 */
     --destructive-foreground: 0 0% 98%; /* Near White */
     --border: 220 13% 91%;       /* Mid Gray #DFE1E6 */
     --input: 220 13% 91%;         /* Mid Gray #DFE1E6 */
-    --ring: 210 100% 40%;        /* Vibrant Blue #0052CC */
+    --ring: 221 83% 53%;        /* Vibrant Blue #3B82F6 */
     --chart-1: 12 76% 61%;       /* Default chart color */
     --chart-2: 173 58% 39%;      /* Default chart color */
     --chart-3: 197 37% 24%;      /* Default chart color */
     --chart-4: 43 74% 66%;       /* Default chart color */
     --chart-5: 27 87% 67%;       /* Default chart color */
     --radius: 0.5rem;             /* 8px rounded corners */
+
+    /* Sidebar Specific Colors */
     --sidebar-background: 0 0% 100%; /* White */
     --sidebar-foreground: 217 55% 20%; /* Dark Gray #172B4D */
-    --sidebar-primary: 210 100% 40%; /* Vibrant Blue #0052CC */
+    --sidebar-primary: 221 83% 53%; /* Vibrant Blue #3B82F6 */
     --sidebar-primary-foreground: 0 0% 98%; /* Near White */
-    --sidebar-accent: 216 100% 95.5%; /* Soft Blue #E9F2FF */
-    --sidebar-accent-foreground: 210 100% 40%; /* Vibrant Blue #0052CC */
+    --sidebar-accent: 220 100% 95%; /* Lighter Primary Blue #EBF5FF */
+    --sidebar-accent-foreground: 221 83% 53%; /* Vibrant Blue #3B82F6 */
     --sidebar-border: 220 13% 91%; /* Mid Gray #DFE1E6 */
-    --sidebar-ring: 210 100% 40%; /* Vibrant Blue #0052CC */
+    --sidebar-ring: 221 83% 53%; /* Vibrant Blue #3B82F6 */
 
-    /* Custom status colors */
-    --status-yellow: 39 100% 50%;   /* Yellow #FFAB00 */
-    --status-red: 13 89% 45%;      /* Red #DE350B */
+    /* Custom status colors from image (approximations) */
+    --status-yellow: 43 90% 70%;   /* Light Yellow #FFDA63 */
+    --status-red: 0 80% 80%;      /* Light Red #FFB3B3 */
+    --status-green: 145 63% 85%;    /* Light Green #D1F7E0 - approximation */
+    --status-blue: 210 100% 85%;    /* Light Blue #B3D4FF - approximation */
+
+    /* Priority border colors */
+    --priority-high: 0 72% 51%; /* Red */
+    --priority-medium: 39 100% 50%; /* Yellow */
+    --priority-low: 145 63% 49%; /* Green */
   }
 
   .dark {
@@ -56,36 +65,45 @@ body {
     --card-foreground: 0 0% 98%;  /* Near White */
     --popover: 217 55% 10%;      /* Darker Blue/Gray */
     --popover-foreground: 0 0% 98%; /* Near White */
-    --primary: 210 100% 60%;      /* Lighter Vibrant Blue */
+    --primary: 221 83% 63%;      /* Lighter Vibrant Blue */
     --primary-foreground: 217 55% 10%; /* Darker Blue/Gray */
     --secondary: 220 10% 20%;     /* Dark Gray */
     --secondary-foreground: 0 0% 98%; /* Near White */
     --muted: 220 10% 20%;         /* Dark Gray */
     --muted-foreground: 220 10% 60%; /* Lighter Gray */
-    --accent: 210 100% 25%;       /* Darker Accent Blue */
+    --accent: 221 83% 25%;       /* Darker Accent Blue */
     --accent-foreground: 0 0% 98%;  /* Near White */
-    --destructive: 13 80% 60%;    /* Lighter Red */
+    --destructive: 0 72% 61%;    /* Lighter Red */
     --destructive-foreground: 0 0% 98%; /* Near White */
     --border: 220 10% 30%;       /* Dark Mid Gray */
     --input: 220 10% 30%;         /* Dark Mid Gray */
-    --ring: 210 100% 60%;        /* Lighter Vibrant Blue */
+    --ring: 221 83% 63%;        /* Lighter Vibrant Blue */
     --chart-1: 220 70% 50%;       /* Default chart color */
     --chart-2: 160 60% 45%;       /* Default chart color */
     --chart-3: 30 80% 55%;        /* Default chart color */
     --chart-4: 280 65% 60%;       /* Default chart color */
     --chart-5: 340 75% 55%;       /* Default chart color */
+
+    /* Sidebar Specific Colors */
     --sidebar-background: 217 55% 15%; /* Dark Card Background */
     --sidebar-foreground: 0 0% 98%; /* Near White */
-    --sidebar-primary: 210 100% 60%; /* Lighter Vibrant Blue */
+    --sidebar-primary: 221 83% 63%; /* Lighter Vibrant Blue */
     --sidebar-primary-foreground: 217 55% 10%; /* Darker Blue/Gray */
-    --sidebar-accent: 210 100% 25%; /* Darker Accent Blue */
+    --sidebar-accent: 221 83% 25%; /* Darker Accent Blue */
     --sidebar-accent-foreground: 0 0% 98%; /* Near White */
     --sidebar-border: 220 10% 30%; /* Dark Mid Gray */
-    --sidebar-ring: 210 100% 60%; /* Lighter Vibrant Blue */
+    --sidebar-ring: 221 83% 63%; /* Lighter Vibrant Blue */
 
     /* Custom status colors */
-    --status-yellow: 39 100% 60%;   /* Lighter Yellow */
-    --status-red: 13 80% 60%;      /* Lighter Red */
+    --status-yellow: 43 90% 60%;   /* Lighter Yellow */
+    --status-red: 0 80% 70%;      /* Lighter Red */
+    --status-green: 145 63% 65%;    /* Lighter Green */
+    --status-blue: 210 100% 75%;    /* Lighter Blue */
+
+    /* Priority border colors */
+    --priority-high: 0 72% 61%; /* Lighter Red */
+    --priority-medium: 39 100% 60%; /* Lighter Yellow */
+    --priority-low: 145 63% 59%; /* Lighter Green */
   }
 }
 
@@ -102,13 +120,14 @@ body {
   }
 }
 
-/* Additional global styles */
-.status-yellow {
-  background-color: hsl(var(--status-yellow));
-  color: hsl(var(--card-foreground)); /* Ensure readability */
+/* Additional global styles - kept priority styles on card component */
+/* status colors are not used directly, relying on priority for now */
+.priority-border-high {
+    border-left-color: hsl(var(--priority-high));
 }
-
-.status-red {
-  background-color: hsl(var(--status-red));
-  color: hsl(var(--destructive-foreground)); /* Ensure readability */
+.priority-border-medium {
+    border-left-color: hsl(var(--priority-medium));
+}
+.priority-border-low {
+    border-left-color: hsl(var(--priority-low));
 }

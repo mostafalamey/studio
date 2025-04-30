@@ -1,5 +1,6 @@
 
 import type { Timestamp } from 'firebase/firestore';
+import { format } from 'date-fns'; // Import date-fns format
 
 export type UserRole = 'employee' | 'manager' | 'owner';
 
@@ -72,25 +73,15 @@ export const initialColumns: Column[] = [
     { id: 'blocked', title: 'Blocked' },
 ];
 
-// Helper function to format Firebase Timestamp to "L2-5 OCT" format
-export function formatDueDate(timestamp: Timestamp | null): string {
+// Helper function to format Firebase Timestamp using date-fns
+export function formatDueDate(timestamp: Timestamp | null, formatString: string = 'yyyy-MM-dd'): string {
   if (!timestamp) return 'No Due Date';
 
-  const date = timestamp.toDate();
-  const day = date.getDate();
-  const month = date.toLocaleString('default', { month: 'short' }).toUpperCase();
-  // const yearLastTwo = date.getFullYear().toString().slice(-2); // Get last two digits of the year
-
-  // Calculate the "L" value (Level/Week). This is a simple example, adjust logic as needed.
-  // This example calculates the week number of the year.
-  // const startOfYear = new Date(date.getFullYear(), 0, 1);
-  // const diff = date.getTime() - startOfYear.getTime();
-  // const oneDay = 1000 * 60 * 60 * 24;
-  // const dayOfYear = Math.floor(diff / oneDay);
-  // const weekNumber = Math.ceil((dayOfYear + startOfYear.getDay() + 1) / 7);
-  // const level = `L${weekNumber}`;
-
-
-  // return `${level}-${day} ${month} ${yearLastTwo}`; // Example: L40-5 OCT 23
-   return `${day} ${month}`; // Simpler format: 5 OCT
+  try {
+    const date = timestamp.toDate();
+    return format(date, formatString); // Use date-fns format
+  } catch (error) {
+    console.error("Error formatting date:", error);
+    return 'Invalid Date';
+  }
 }

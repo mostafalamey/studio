@@ -41,13 +41,8 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
         orderBy('createdAt', 'asc') // Example ordering, adjust as needed
     );
 
-    // Filter for employees: show only tasks assigned to them OR unassigned tasks
+    // Filter for employees: show only tasks assigned to them
      if (userRole === 'employee' && user) {
-         // Employees see tasks assigned to them or tasks that are unassigned.
-         // Firestore doesn't directly support OR queries on different fields easily.
-         // A common workaround is to fetch assigned tasks and then potentially fetch unassigned ones
-         // separately, or restructure data (e.g., add an 'assignees' array field).
-         // For Phase 1, show only assigned tasks for employees.
          tasksQuery = query(baseQuery, where('assigneeId', '==', user.uid));
      } else if (userRole === 'manager' || userRole === 'owner') {
         // Managers and Owners see all tasks for the project
@@ -146,10 +141,14 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
   if (loading) {
      return (
         // Loading state with skeletons, maintaining the flex layout
-        <div className="flex-1 flex gap-4 p-4 md:p-6 overflow-x-auto">
-          {[...Array(initialColumns.length)].map((_, i) => (
-             <div key={i} className="flex flex-col flex-1 min-w-[280px] max-w-[320px] bg-secondary p-3 rounded-lg"> {/* Skeleton column */}
-               <Skeleton className="h-6 w-1/2 mb-4" />
+        <div className="flex-1 flex flex-wrap gap-4 p-4 md:p-6 overflow-y-auto">
+          {initialColumns.map((column) => (
+             <div key={column.id} className="flex flex-col flex-1 min-w-[280px] bg-secondary/50 p-3 rounded-lg"> {/* Adjusted skeleton column bg */}
+               {/* Simplified Skeleton Header */}
+               <div className="flex items-center justify-between mb-4">
+                 <Skeleton className="h-5 w-1/3" />
+                 <Skeleton className="h-5 w-8 rounded-full" />
+               </div>
                <Skeleton className="h-24 w-full mb-2 rounded-lg" />
                <Skeleton className="h-20 w-full mb-2 rounded-lg" />
                <Skeleton className="h-28 w-full rounded-lg" />
@@ -165,29 +164,31 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
 
   return (
     <DndProvider backend={HTML5Backend}>
-       <div className="flex flex-col flex-1 h-full overflow-hidden"> {/* Container takes available height */}
-         {/* Add Task Button */}
+       {/* Container uses flex-1 to fill space, overflow-y-auto for vertical scroll */}
+       <div className="flex flex-col flex-1 h-full overflow-hidden p-4 md:p-6">
+         {/* Top Bar: Add Task Button (aligned right) */}
          {(userRole === 'manager' || userRole === 'owner') && (
-           <div className="px-4 md:px-6 pt-4 mb-4 flex-shrink-0">
-             <Button onClick={openAddTaskModal}>
+           <div className="flex justify-end mb-4 flex-shrink-0">
+             <Button onClick={openAddTaskModal} className="bg-primary hover:bg-primary/90"> {/* Primary blue button */}
                <PlusCircle className="w-4 h-4 mr-2" />
-               Add Task
+               New Task
              </Button>
            </div>
          )}
 
-         {/* Kanban Columns Area - Flex, horizontal scroll on overflow */}
-         <div className="flex flex-1 gap-4 p-4 md:px-6 md:pb-6 overflow-x-auto">
-           {initialColumns.map((column) => (
-             <KanbanColumn
-               key={column.id}
-               column={column}
-               tasks={tasks.filter((task) => task.columnId === column.id)}
-               onDropTask={handleDropTask}
-               onTaskClick={openTaskDetailModal}
-             />
-           ))}
-         </div>
+         {/* Kanban Columns Area - Flex container, now with wrapping and vertical scroll */}
+          <div className="flex flex-1 gap-4 overflow-y-auto pb-4"> {/* Allow vertical scroll, remove horizontal */}
+            {initialColumns.map((column) => (
+                <KanbanColumn
+                  key={column.id}
+                  column={column}
+                  // Filter tasks for the current column
+                  tasks={tasks.filter((task) => task.columnId === column.id)}
+                  onDropTask={handleDropTask}
+                  onTaskClick={openTaskDetailModal}
+                />
+            ))}
+          </div>
        </div>
 
        {/* Task Detail Modal */}

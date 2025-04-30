@@ -6,6 +6,7 @@ import { useDrop } from 'react-dnd';
 import KanbanCard from './kanban-card';
 import type { Task, ColumnId, Column } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge'; // Import Badge
 import { cn } from '@/lib/utils';
 
 interface KanbanColumnProps {
@@ -31,40 +32,41 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ column, tasks, onDropTask, 
       isOver: !!monitor.isOver(),
       canDrop: !!monitor.canDrop(),
     }),
-     // canDrop: (item: { id: string; columnId: ColumnId }) => {
-     //   // Add logic here if certain tasks cannot be dropped into certain columns
-     //   return true; // Default: allow dropping any task
-     // },
   }), [column.id, onDropTask]);
 
   return (
     <div
       ref={drop}
       className={cn(
-        "flex flex-col rounded-lg h-full w-full flex-shrink-0 md:w-[280px] md:flex-shrink", // Adjusted width for responsiveness
-        isOver && canDrop ? 'bg-accent' : 'bg-secondary' // Use secondary for default background
+        "flex flex-col h-full min-w-[280px] flex-1 rounded-lg", // Use flex-1 for responsive width, remove fixed width
+        isOver && canDrop ? 'bg-accent/60' : 'bg-secondary/50' // Lighter bg, slight accent on hover
       )}
+      style={{ flexBasis: '280px' }} // Set a base width, flex-grow handles expansion
     >
-      <Card className="flex flex-col flex-grow bg-secondary border-none shadow-none"> {/* Use secondary color, remove internal border/shadow */}
-        <CardHeader className="p-3 sticky top-0 bg-secondary z-10 border-b"> {/* Make header sticky */}
-          <CardTitle className="text-base font-semibold text-foreground">{column.title} ({tasks.length})</CardTitle>
-        </CardHeader>
-        <CardContent className="p-3 space-y-3 overflow-y-auto flex-grow min-h-[100px]"> {/* Allow content to scroll, add min-height */}
+      {/* Removed outer Card component, using div for bg color */}
+      <div className="flex flex-col flex-grow p-3"> {/* Add padding to the main div */}
+        <div className="flex items-center justify-between mb-4 sticky top-0 bg-secondary/50 pt-1 pb-2 z-10 -mx-3 px-3"> {/* Sticky header with padding */}
+          <h3 className="text-sm font-semibold text-foreground">{column.title}</h3>
+          <Badge variant="secondary" className="text-xs font-semibold rounded-full px-2 py-0.5">
+            {tasks.length}
+          </Badge>
+        </div>
+        <div className="space-y-2 overflow-y-auto flex-grow min-h-[100px] -mx-1 px-1"> {/* Allow content to scroll, add negative margin compensation */}
           {tasks.length === 0 && !isOver && (
-            <div className="text-center text-muted-foreground italic py-4">No tasks</div>
+            <div className="text-center text-muted-foreground italic py-4 text-sm">Drop tasks here</div>
           )}
            {tasks.map((task) => (
              <KanbanCard key={task.id} task={task} onClick={() => onTaskClick(task)} />
            ))}
            {isOver && canDrop && (
-             <div className="h-16 rounded-lg border-2 border-dashed border-primary bg-primary/10 flex items-center justify-center text-primary">
+             <div className="h-16 rounded-lg border-2 border-dashed border-primary bg-primary/10 flex items-center justify-center text-primary text-sm">
                Drop here
              </div>
            )}
-           {/* Add a spacer div to push content up when column is empty or short */}
+           {/* Spacer div to push content up */}
            <div className="flex-grow"></div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 };

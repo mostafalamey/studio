@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -21,10 +22,18 @@ const ItemTypes = {
   TASK: 'task',
 };
 
-const priorityStyles: Record<Priority, string> = {
-  Low: 'bg-green-100 text-green-800 border-green-300',
-  Medium: 'bg-yellow-100 text-yellow-800 border-yellow-300 status-yellow', // Use status-yellow for background
-  High: 'bg-red-100 text-red-800 border-red-300 status-red', // Use status-red for background
+// Priority border classes using CSS variables defined in globals.css
+const priorityBorderStyles: Record<Priority, string> = {
+    High: "priority-border-high",
+    Medium: "priority-border-medium",
+    Low: "priority-border-low",
+};
+
+// Badge styles based on priority (approximations from image)
+const priorityBadgeStyles: Record<Priority, string> = {
+  High: 'bg-status-red text-destructive-foreground border-transparent', // Use status-red background
+  Medium: 'bg-status-yellow text-foreground border-transparent', // Use status-yellow background
+  Low: 'bg-status-green text-foreground border-transparent', // Use status-green background
 };
 
 const KanbanCard: React.FC<KanbanCardProps> = ({ task, onClick }) => {
@@ -46,57 +55,100 @@ const KanbanCard: React.FC<KanbanCardProps> = ({ task, onClick }) => {
   }), [task.id, task.columnId, userRole, user?.uid, task.assigneeId]); // Add dependencies
 
 
-  const getInitials = (name?: string) => {
-    if (!name) return '?';
-    return name.split(' ').map(n => n[0]).join('').toUpperCase();
+  const getInitials = (name?: string | null) => {
+    if (!name || typeof name !== 'string') return '?'; // Add type check
+    // Simple initials: first letter of first and last name
+     const names = name.trim().split(' ');
+     if (names.length === 1) return names[0][0].toUpperCase();
+     return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
   };
+
+   // Generate a consistent, somewhat unique task identifier (e.g., U1, U2)
+   // This is a simple example, might need refinement for uniqueness across projects/time
+    const generateTaskShortId = (taskId: string) => {
+        // Use a simple hash or part of the ID for display
+        // Warning: This is NOT guaranteed to be unique and is just for visual similarity to the image
+        let hash = 0;
+        for (let i = 0; i < taskId.length; i++) {
+            const char = taskId.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash |= 0; // Convert to 32bit integer
+        }
+        // Take absolute value and modulo to get a somewhat consistent number
+        const num = Math.abs(hash) % 1000; // Example: Limit to U0 - U999
+        return `U${num}`;
+    };
+
+    const taskShortId = generateTaskShortId(task.id);
+
 
   return (
     <div ref={drag} // Attach drag ref here
         onClick={onClick} // Attach onClick handler
         className={cn(
-            "cursor-pointer", // Make it clear it's clickable
+            "cursor-pointer group", // Make it clear it's clickable, add group for hover states
             isDragging ? 'opacity-50' : 'opacity-100'
         )}
         aria-label={`Task: ${task.name}`} // Updated aria-label
      >
-      <Card className="mb-2 shadow-sm hover:shadow-md transition-shadow duration-200 rounded-lg bg-card">
-        <CardHeader className="p-3 pb-1">
-           {/* Remove CardTitle */}
-           {/* Use a simple paragraph or div for the name */}
-           <p className="text-sm font-medium leading-tight text-card-foreground">{task.name}</p>
-        </CardHeader>
-        <CardContent className="p-3 pt-1 pb-2 text-xs text-muted-foreground space-y-2">
-          <div className="flex items-center space-x-2">
-            <CalendarDays className="w-3.5 h-3.5" />
-            <span>{formatDueDate(task.dueDate)}</span>
-          </div>
-           <Badge variant="outline" className={cn("text-xs", priorityStyles[task.priority])}>
-               {task.priority}
+      {/* Added border-l-4 for priority color */}
+      <Card className={cn(
+            "mb-2 shadow-sm hover:shadow-md transition-shadow duration-200 rounded-lg bg-card border-l-4",
+            priorityBorderStyles[task.priority] // Apply dynamic border color
+        )}>
+        <CardHeader className="p-3 pb-1 flex flex-row justify-between items-center">
+            {/* Task Short ID Badge */}
+           <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300 px-1.5 py-0.5">
+              {taskShortId}
            </Badge>
+            {/* Assignee Avatar (moved to header) */}
+           <Avatar className="h-6 w-6" title={`Assigned to: ${task.assigneeName || 'Unassigned'}`}>
+             {/* Add AvatarImage if you store profile picture URLs */}
+             {/* <AvatarImage src={task.assigneeAvatarUrl} alt={task.assigneeName} /> */}
+             <AvatarFallback className={cn(
+                    "text-xs font-semibold",
+                    task.assigneeId ? "bg-destructive text-destructive-foreground" : "bg-muted" // Red background like image for assigned
+                 )}>
+                {task.assigneeId ? getInitials(task.assigneeName) : <User className="w-3 h-3" />}
+             </AvatarFallback>
+           </Avatar>
+        </CardHeader>
+        <CardContent className="p-3 pt-0 pb-2 space-y-1">
+          {/* Task Name */}
+           <p className="text-sm font-medium leading-snug text-card-foreground break-words">{task.name}</p>
+          {/* Date */}
+           <div className="flex items-center space-x-1 text-xs text-muted-foreground">
+              <CalendarDays className="w-3 h-3" />
+              <span>{formatDueDate(task.dueDate, 'yyyy-MM-dd')}</span> {/* Format date as YYYY-MM-DD */}
+           </div>
         </CardContent>
-        <CardFooter className="p-3 pt-0 flex justify-between items-center text-xs text-muted-foreground">
-          <div className="flex items-center space-x-2">
-            {task.comments?.length > 0 && (
+        <CardFooter className="p-3 pt-0 flex justify-start items-center text-xs text-muted-foreground space-x-3">
+            {/* Comments and Attachments */}
+             {task.comments?.length > 0 && (
               <div className="flex items-center space-x-1" title={`${task.comments.length} comments`}>
                 <MessageSquare className="w-3.5 h-3.5" />
                 <span>{task.comments.length}</span>
               </div>
             )}
-            {task.attachments?.length > 0 && (
+             {task.attachments?.length > 0 && (
               <div className="flex items-center space-x-1" title={`${task.attachments.length} attachments`}>
                 <Paperclip className="w-3.5 h-3.5" />
                 <span>{task.attachments.length}</span>
               </div>
             )}
-          </div>
-          <Avatar className="h-6 w-6" title={`Assigned to: ${task.assigneeName || 'Unassigned'}`}>
-             {/* Add AvatarImage if you store profile picture URLs */}
-             {/* <AvatarImage src={task.assigneeAvatarUrl} alt={task.assigneeName} /> */}
-             <AvatarFallback className="text-xs bg-muted">
-                {task.assigneeId ? getInitials(task.assigneeName) : <User className="w-3 h-3" />}
-             </AvatarFallback>
-           </Avatar>
+             {/* Show icons even if count is 0, but muted/grayed out */}
+             {(!task.comments || task.comments.length === 0) && (
+                <div className="flex items-center space-x-1 text-muted-foreground/50" title="0 comments">
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>0</span>
+                </div>
+             )}
+              {(!task.attachments || task.attachments.length === 0) && (
+                <div className="flex items-center space-x-1 text-muted-foreground/50" title="0 attachments">
+                  <Paperclip className="w-3.5 h-3.5" />
+                  <span>0</span>
+                </div>
+             )}
         </CardFooter>
       </Card>
     </div>
