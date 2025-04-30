@@ -1,3 +1,4 @@
+
 import type { Timestamp } from 'firebase/firestore';
 
 export type UserRole = 'employee' | 'manager' | 'owner';
@@ -16,6 +17,7 @@ export interface Project {
 
 export interface Task {
   id: string;
+  taskId: string; // Explicit task ID field
   projectId: string;
   name: string; // Renamed from title
   dueDate: Timestamp | null; // Storing as Timestamp for easier querying/sorting
@@ -27,6 +29,7 @@ export interface Task {
   columnId: ColumnId;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  createdBy: string; // Add creator info if needed
 }
 
 export interface Comment {

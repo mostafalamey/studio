@@ -15,7 +15,7 @@ import { format } from 'date-fns';
 import { cn } from "@/lib/utils";
 import type { Priority, AppUser } from '@/lib/types';
 import { useFirebase } from '@/components/providers/firebase-provider';
-import { collection, addDoc, Timestamp, getDocs, query } from 'firebase/firestore';
+import { collection, addDoc, Timestamp, getDocs, query, doc, setDoc } from 'firebase/firestore'; // Added doc, setDoc
 import { useToast } from '@/hooks/use-toast';
 
 interface AddTaskModalProps {
@@ -84,7 +84,13 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, projectId,
 
     try {
       const tasksCollection = collection(db, 'tasks');
-      await addDoc(tasksCollection, {
+      // Generate a new doc ref to get the ID *before* saving
+      const newTaskRef = doc(tasksCollection);
+      const newTaskId = newTaskRef.id;
+
+      await setDoc(newTaskRef, {
+        id: newTaskId, // Store the generated ID within the document
+        taskId: newTaskId, // Add explicit taskId field
         projectId: projectId,
         name: taskName.trim(),
         dueDate: dueDate ? Timestamp.fromDate(dueDate) : null,
