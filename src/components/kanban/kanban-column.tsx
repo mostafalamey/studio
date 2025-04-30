@@ -41,16 +41,15 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ column, tasks, onDropTask, 
     <div
       ref={drop}
       className={cn(
-        "flex flex-col rounded-lg h-full min-h-[calc(100vh-250px)]", // Removed fixed width and flex-shrink, adjusted min-height
+        "flex flex-col rounded-lg h-full w-full flex-shrink-0 md:w-[280px] md:flex-shrink", // Adjusted width for responsiveness
         isOver && canDrop ? 'bg-accent' : 'bg-secondary' // Use secondary for default background
       )}
-      // Removed fixed minHeight style, relying on Tailwind class now
     >
       <Card className="flex flex-col flex-grow bg-secondary border-none shadow-none"> {/* Use secondary color, remove internal border/shadow */}
         <CardHeader className="p-3 sticky top-0 bg-secondary z-10 border-b"> {/* Make header sticky */}
           <CardTitle className="text-base font-semibold text-foreground">{column.title} ({tasks.length})</CardTitle>
         </CardHeader>
-        <CardContent className="p-3 space-y-3 overflow-y-auto flex-grow"> {/* Allow content to scroll */}
+        <CardContent className="p-3 space-y-3 overflow-y-auto flex-grow min-h-[100px]"> {/* Allow content to scroll, add min-height */}
           {tasks.length === 0 && !isOver && (
             <div className="text-center text-muted-foreground italic py-4">No tasks</div>
           )}
@@ -62,6 +61,8 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ column, tasks, onDropTask, 
                Drop here
              </div>
            )}
+           {/* Add a spacer div to push content up when column is empty or short */}
+           <div className="flex-grow"></div>
         </CardContent>
       </Card>
     </div>
@@ -69,4 +70,3 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ column, tasks, onDropTask, 
 };
 
 export default KanbanColumn;
-

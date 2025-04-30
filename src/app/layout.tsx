@@ -26,17 +26,20 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning={true}>{/* Add suppressHydrationWarning here */}
-      <body className={`${inter.variable} font-sans antialiased`} suppressHydrationWarning={true}> {/* Use Inter font, add suppressHydrationWarning */}
+      <body className={`${inter.variable} font-sans antialiased h-screen flex flex-col`} suppressHydrationWarning={true}> {/* Use Inter font, add suppressHydrationWarning, ensure full height and flex column */}
         <FirebaseProvider>
           <ProjectProvider> {/* Wrap with ProjectProvider */}
             <SidebarProvider defaultOpen={true}> {/* Wrap with SidebarProvider */}
-              <AppSidebar /> {/* Add the AppSidebar */}
-              <SidebarInset className="flex flex-col"> {/* Use SidebarInset for main content area */}
-                <AppHeader /> {/* Add the AppHeader */}
-                <main className="flex-1 overflow-y-auto p-4 md:p-6"> {/* Main content area with padding */}
-                  {children}
-                </main>
-              </SidebarInset>
+              <div className="flex flex-1 overflow-hidden"> {/* Main container for sidebar + content, prevent body scroll */}
+                <AppSidebar /> {/* Add the AppSidebar */}
+                <SidebarInset className="flex flex-col flex-1 overflow-hidden"> {/* Use SidebarInset for main content area, flex-1, overflow hidden */}
+                  <AppHeader /> {/* Add the AppHeader */}
+                  {/* Remove redundant main tag, let children fill the space */}
+                  <div className="flex-1 overflow-y-auto"> {/* Make this div scrollable instead of main */}
+                     {children}
+                  </div>
+                </SidebarInset>
+              </div>
               <Toaster />
             </SidebarProvider>
           </ProjectProvider>
