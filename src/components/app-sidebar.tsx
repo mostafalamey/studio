@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -12,7 +13,7 @@ import {
   SidebarSeparator,
   SidebarGroup,
   SidebarGroupLabel,
-  SidebarTrigger, // Re-added trigger if needed in header
+  // SidebarTrigger, // Removed as it's in AppHeader now
   SidebarMenuSkeleton,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -35,12 +36,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton component
+import { Textarea } from "@/components/ui/textarea"; // Import Textarea
+import { useProjectContext } from '@/components/providers/project-provider'; // Correct import path and removed ProjectProvider
 
 
 // Define props if sidebar needs external control, e.g., selected project ID
 interface AppSidebarProps {
-  // selectedProjectId?: string | null; // Example prop
-  // onSelectProject?: (projectId: string) => void; // Example prop
+  // selectedProjectId?: string | null; // Example prop - Now handled by context
+  // onSelectProject?: (projectId: string) => void; // Example prop - Now handled by context
 }
 
 const AppSidebar: React.FC<AppSidebarProps> = (/* { selectedProjectId, onSelectProject } */) => {
@@ -48,11 +51,11 @@ const AppSidebar: React.FC<AppSidebarProps> = (/* { selectedProjectId, onSelectP
   const { toast } = useToast();
   const [isAddingProject, setIsAddingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectDescription, setNewProjectDescription] = useState(''); // Added state for description
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
+  const { selectedProjectId, setSelectedProjectId } = useProjectContext(); // Use context
 
-   // --- Project Fetching Logic (moved from page.tsx) ---
-   const [currentlySelectedProjectId, setCurrentlySelectedProjectId] = useState<string | null>(null);
-
+   // --- Project Fetching Logic ---
    // Conditionally define the query based on user role
    let projectsQuery: Query | CollectionReference | null = null;
    if (db) {
@@ -60,42 +63,32 @@ const AppSidebar: React.FC<AppSidebarProps> = (/* { selectedProjectId, onSelectP
      if (userRole === 'manager' || userRole === 'owner') {
        projectsQuery = query(projectsCollection, orderBy('createdAt', 'desc'));
      } else if (userRole === 'employee' && user) {
-        // Placeholder: Filter projects based on employee assignments (requires data model change or complex query)
-        // For Phase 1 simplicity, let's show projects they are assigned to, assuming a simple direct assignment or showing all.
-        // Showing all for now, refine later based on exact requirements.
+        // For Phase 1 simplicity, show all projects. Refine later if needed.
        projectsQuery = query(projectsCollection, orderBy('createdAt', 'desc'));
-       // Example of filtering by assignee (requires tasks subcollection or denormalization):
-       // const tasksRef = collectionGroup(db, 'tasks');
-       // const userTasksQuery = query(tasksRef, where('assigneeId', '==', user.uid));
-       // Fetch task projectIds, then fetch projects (more complex)
      } else {
        projectsQuery = null; // No query if not logged in or role invalid
      }
    }
 
-   const [projects, projectsLoading, projectsError] = useCollectionData<Project>(projectsQuery as Query<Project>, {
+   const [projects, projectsLoading, projectsError] = useCollectionData<Project>(projectsQuery as Query<Project> | null, { // Handle null query case
      snapshotListenOptions: { includeMetadataChanges: true },
      idField: 'id',
    });
 
+
    // Automatically select the first project if none is selected and projects load
    React.useEffect(() => {
-    if (!currentlySelectedProjectId && projects && projects.length > 0) {
-      // Check if the `onSelectProject` prop exists and call it
-      // if (onSelectProject) {
-      //   onSelectProject(projects[0].id);
-      // }
-      setCurrentlySelectedProjectId(projects[0].id); // Also keep internal state for highlighting
+    if (!selectedProjectId && projects && projects.length > 0) {
+      setSelectedProjectId(projects[0].id); // Update context
     }
-  }, [projects, currentlySelectedProjectId /*, onSelectProject */]);
+    // Do not automatically select if a project is already selected
+   }, [projects, selectedProjectId, setSelectedProjectId]);
+
 
    const handleSelectProject = (projectId: string) => {
-    // if (onSelectProject) {
-    //   onSelectProject(projectId);
-    // }
-    setCurrentlySelectedProjectId(projectId);
+    setSelectedProjectId(projectId); // Update context
     // Potentially close mobile sidebar if open
-    // useSidebar().setOpenMobile(false);
+    // useSidebar().setOpenMobile(false); // Uncomment if needed
   };
    // --- End Project Fetching Logic ---
 
@@ -105,7 +98,7 @@ const AppSidebar: React.FC<AppSidebarProps> = (/* { selectedProjectId, onSelectP
     try {
       await auth.signOut();
       toast({ title: "Logged Out", description: "You have been successfully logged out." });
-      setCurrentlySelectedProjectId(null); // Clear selection on logout
+      setSelectedProjectId(null); // Clear context
       // User state change will trigger re-render via FirebaseProvider
     } catch (error) {
       console.error("Logout error:", error);
@@ -113,19 +106,22 @@ const AppSidebar: React.FC<AppSidebarProps> = (/* { selectedProjectId, onSelectP
     }
   };
 
-  const handleAddProject = async () => {
-    if (!db || !newProjectName.trim()) return;
+   const handleAddProject = async () => {
+    if (!db || !newProjectName.trim() || !user) return;
     setIsAddingProject(true);
 
     try {
       const projectsCollection = collection(db, 'projects');
       const docRef = await addDoc(projectsCollection, {
         name: newProjectName.trim(),
+        description: newProjectDescription.trim(), // Add description
         createdAt: Timestamp.now(),
-        // Add createdBy field if needed: createdBy: user?.uid
+        createdBy: user.uid, // Link to the user who created it
+        // Add other relevant fields if necessary
       });
       toast({ title: "Project Created", description: `"${newProjectName}" added successfully.` });
       setNewProjectName('');
+      setNewProjectDescription(''); // Clear description field
       setIsAddProjectModalOpen(false); // Close modal on success
       handleSelectProject(docRef.id); // Select the newly created project
     } catch (error) {
@@ -151,8 +147,6 @@ const AppSidebar: React.FC<AppSidebarProps> = (/* { selectedProjectId, onSelectP
             <svg className="w-6 h-6 text-primary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
             <span className="font-semibold text-lg truncate group-data-[collapsible=icon]:hidden">ACS ProjectFlow</span>
          </div>
-         {/* Consider moving trigger to header if sidebar is collapsible */}
-         {/* <SidebarTrigger className="ml-auto group-data-[collapsible=icon]:hidden" /> */}
       </SidebarHeader>
 
       <SidebarContent className="p-0">
@@ -174,7 +168,7 @@ const AppSidebar: React.FC<AppSidebarProps> = (/* { selectedProjectId, onSelectP
                  <DialogContent>
                    <DialogHeader>
                      <DialogTitle>Create New Project</DialogTitle>
-                     <DialogDescription>Enter a name for your new project.</DialogDescription>
+                     <DialogDescription>Enter a name and description for your new project.</DialogDescription>
                    </DialogHeader>
                    <div className="grid gap-4 py-4">
                      <div className="grid grid-cols-4 items-center gap-4">
@@ -187,6 +181,17 @@ const AppSidebar: React.FC<AppSidebarProps> = (/* { selectedProjectId, onSelectP
                          disabled={isAddingProject}
                        />
                      </div>
+                      <div className="grid grid-cols-4 items-start gap-4"> {/* Changed items-center to items-start for textarea */}
+                        <Label htmlFor="project-description" className="text-right pt-2">Description</Label> {/* Added padding-top */}
+                        <Textarea
+                          id="project-description"
+                          value={newProjectDescription}
+                          onChange={(e) => setNewProjectDescription(e.target.value)}
+                          className="col-span-3 min-h-[80px]" // Added min-height
+                          disabled={isAddingProject}
+                          placeholder="Optional: Add a brief description..."
+                        />
+                      </div>
                    </div>
                    <DialogFooter>
                      <Button variant="outline" onClick={() => setIsAddProjectModalOpen(false)} disabled={isAddingProject}>Cancel</Button>
@@ -199,27 +204,31 @@ const AppSidebar: React.FC<AppSidebarProps> = (/* { selectedProjectId, onSelectP
              )}
 
              <SidebarMenu>
-                 {projectsLoading && (
-                    // Use React.Fragment with key or map over an array for multiple skeletons
-                    [1, 2, 3].map(i => <SidebarMenuSkeleton key={`skel-${i}`} showIcon />)
+                 {projectsLoading ? (
+                     // Skeletons
+                     [1, 2, 3].map(i => <SidebarMenuSkeleton key={`skel-${i}`} showIcon />)
+                 ) : projectsError ? (
+                     // Error message
+                     <p key="proj-error" className="text-xs text-destructive px-2">Error loading projects.</p>
+                 ) : projects && projects.length > 0 ? (
+                     // Project list
+                     projects.map((project) => (
+                         <SidebarMenuItem key={project.id}> {/* Use project.id as key */}
+                             <SidebarMenuButton
+                                 onClick={() => handleSelectProject(project.id)}
+                                 isActive={selectedProjectId === project.id} // Use context state for isActive
+                                 tooltip={{ children: project.name }} // Show tooltip when collapsed
+                                 className="justify-start group-data-[collapsible=icon]:justify-center"
+                              >
+                                 <FolderKanban className="flex-shrink-0" />
+                                 <span className="truncate">{project.name}</span>
+                             </SidebarMenuButton>
+                         </SidebarMenuItem>
+                     ))
+                 ) : (
+                     // No projects message
+                     <p key="proj-empty" className="text-xs text-muted-foreground px-2 italic">No projects found.</p>
                  )}
-                 {projectsError && <p key="proj-error" className="text-xs text-destructive px-2">Error loading projects.</p>}
-                  {!projectsLoading && !projectsError && projects?.length === 0 && (
-                      <p key="proj-empty" className="text-xs text-muted-foreground px-2 italic">No projects found.</p>
-                  )}
-                  {projects?.map((project) => (
-                  <SidebarMenuItem key={project.id}>
-                    <SidebarMenuButton
-                       onClick={() => handleSelectProject(project.id)}
-                       isActive={currentlySelectedProjectId === project.id}
-                       tooltip={{ children: project.name }} // Show tooltip when collapsed
-                       className="justify-start group-data-[collapsible=icon]:justify-center"
-                    >
-                      <FolderKanban className="flex-shrink-0" />
-                      <span className="truncate">{project.name}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
              </SidebarMenu>
          </SidebarGroup>
       </SidebarContent>
