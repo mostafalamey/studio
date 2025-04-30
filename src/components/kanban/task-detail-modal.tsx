@@ -12,11 +12,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarIcon, Paperclip, Send, Trash2, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from "@/lib/utils";
-import type { Task, Priority, Comment, Attachment, UserRole } from '@/lib/types';
+import type { Task, Priority, Comment, Attachment, UserRole, AppUser } from '@/lib/types'; // Import AppUser
 import { useFirebase } from '@/components/providers/firebase-provider';
-import { doc, updateDoc, Timestamp, arrayUnion, arrayRemove } from 'firebase/firestore';
-import { useCollectionData } from 'react-firebase-hooks/firestore'; // For potential assignee fetching
-import { collection, getDocs, query, where } from 'firebase/firestore'; // For fetching users
+import { doc, updateDoc, Timestamp, arrayUnion, arrayRemove, collection, getDocs, query } from 'firebase/firestore'; // Simplified imports
 import { useToast } from '@/hooks/use-toast';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'; // Firebase Storage
 
@@ -29,16 +27,14 @@ interface TaskDetailModalProps {
 
 // Define which fields are editable by whom
 const editableFieldsByRole: Record<UserRole, (keyof Task)[]> = {
-  employee: ['columnId', 'comments', 'attachments'], // Employees can only add comments/attachments via dedicated inputs
+  employee: ['columnId', 'comments', 'attachments'], // Employees can only add comments/attachments via dedicated inputs and change status via DnD
   manager: ['title', 'dueDate', 'priority', 'assigneeId', 'comments', 'attachments', 'columnId'], // Managers can edit most fields
   owner: ['title', 'dueDate', 'priority', 'assigneeId', 'comments', 'attachments', 'columnId'], // Owners have same edit rights as managers for tasks
 };
 
-interface AppUser {
-  uid: string;
-  displayName: string;
-  email: string;
-  role: UserRole;
+// Interface for user data used in the dropdown
+interface AssigneeOption extends Pick<AppUser, 'uid' | 'displayName' | 'email'> {
+    // Combines required fields for the dropdown
 }
 
 
@@ -52,7 +48,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
   const [attachments, setAttachments] = useState<Attachment[]>(task.attachments || []);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [assigneeOptions, setAssigneeOptions] = useState<AppUser[]>([]); // State for assignee dropdown
+  const [assigneeOptions, setAssigneeOptions] = useState<AssigneeOption[]>([]); // State for assignee dropdown
 
    // Fetch potential assignees (users) when the modal opens or user role allows
    useEffect(() => {
@@ -64,9 +60,13 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
           // Example: Fetch all users - refine this based on who can be assigned
           const q = query(usersRef /*, where('role', 'in', ['employee', 'manager']) */ );
           const querySnapshot = await getDocs(q);
-          const usersList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppUser & { id: string }));
-          // Map to uid and displayName for the dropdown
-          const options = usersList.map(u => ({ uid: u.id, displayName: u.displayName || u.email, email: u.email, role: u.role }));
+          const usersList = querySnapshot.docs.map(doc => ({ ...doc.data() } as AppUser ));
+          // Map to uid and displayName/email for the dropdown
+          const options: AssigneeOption[] = usersList.map(u => ({
+              uid: u.uid,
+              displayName: u.displayName || u.email, // Fallback to email if displayName is missing
+              email: u.email
+          }));
           setAssigneeOptions(options);
         } catch (error) {
           console.error("Error fetching users:", error);
@@ -96,7 +96,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
     if (userRole === 'employee') {
        // Employee can only change status (columnId implicitly via DnD), add comments/attachments
        // Direct editing of other fields is disabled in the form.
-       return false; // Disable direct editing in form for employees
+       // Return true only for fields they can interact with via specific UI elements (comments/attachments)
+       return ['comments', 'attachments'].includes(fieldName);
     }
     return false;
   };
@@ -115,6 +116,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
     if (date) {
       setEditedTask(prev => ({ ...prev, dueDate: Timestamp.fromDate(date) }));
     } else {
+      // Set dueDate to null if date is cleared
       setEditedTask(prev => ({ ...prev, dueDate: null }));
     }
   };
@@ -183,7 +185,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
       // Delete from Firestore
       const taskRef = doc(db, 'tasks', task.id);
       await updateDoc(taskRef, {
-        attachments: arrayRemove(attachmentToDelete),
+        attachments: arrayRemove(attachments.find(att => att.id === attachmentToDelete.id)), // Ensure removing the exact object reference if needed
         updatedAt: Timestamp.now()
       });
 
@@ -192,7 +194,24 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
 
     } catch (error) {
       console.error("Error deleting attachment:", error);
-      toast({ title: "Deletion Error", description: "Failed to delete attachment.", variant: "destructive" });
+       // Check if the error is because the object doesn't exist (already deleted?)
+       if ((error as any).code === 'storage/object-not-found') {
+            toast({ title: "Info", description: "Attachment already removed from storage.", variant: "default" });
+            // Still attempt to remove from Firestore if it wasn't already
+             try {
+                const taskRef = doc(db, 'tasks', task.id);
+                await updateDoc(taskRef, {
+                   attachments: arrayRemove(attachments.find(att => att.id === attachmentToDelete.id)),
+                   updatedAt: Timestamp.now()
+                });
+                setAttachments(prev => prev.filter(att => att.id !== attachmentToDelete.id));
+             } catch (firestoreError) {
+                console.error("Error removing attachment from Firestore after storage error:", firestoreError);
+                toast({ title: "Deletion Error", description: "Failed to update task details after storage issue.", variant: "destructive" });
+             }
+       } else {
+         toast({ title: "Deletion Error", description: "Failed to delete attachment.", variant: "destructive" });
+       }
     }
   };
 
@@ -230,16 +249,21 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
 
 
    const handleSaveChanges = async () => {
-    if (!db || !user || Object.keys(editedTask).length === 0) {
-        // If no changes, just close
-        if (Object.keys(editedTask).length === 0) {
-            onClose();
-            return;
-        }
-        // If db or user is not available (shouldn't happen if modal is open), show error
-        toast({ title: "Error", description: "Cannot save changes. Please try again.", variant: "destructive" });
+    if (!db || !user) {
+        toast({ title: "Error", description: "Cannot save changes. Authentication or database connection issue.", variant: "destructive" });
         return;
     };
+
+     // Check if there are actual changes to save
+    const changesToSave = Object.keys(editedTask).some(key =>
+        isEditable(key as keyof Task) && editedTask[key as keyof Task] !== task[key as keyof Task]
+    );
+
+     if (!changesToSave) {
+         onClose(); // No changes, just close
+         return;
+     }
+
 
     setIsSaving(true);
     const taskRef = doc(db, 'tasks', task.id);
@@ -251,9 +275,11 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
         if (isEditable(fieldName)) {
             // Special handling for assigneeId to also update assigneeName
             if (fieldName === 'assigneeId') {
-                const selectedAssignee = assigneeOptions.find(opt => opt.uid === editedTask.assigneeId);
-                updateData.assigneeId = editedTask.assigneeId ?? null;
-                updateData.assigneeName = selectedAssignee?.displayName ?? ''; // Denormalize name
+                const newAssigneeId = editedTask.assigneeId ?? null;
+                const selectedAssignee = assigneeOptions.find(opt => opt.uid === newAssigneeId);
+                updateData.assigneeId = newAssigneeId;
+                // Use optional chaining and nullish coalescing
+                updateData.assigneeName = selectedAssignee?.displayName ?? '';
             } else {
                (updateData as any)[fieldName] = (editedTask as any)[fieldName];
             }
@@ -261,14 +287,20 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
     }
 
 
-    // Add updatedAt timestamp
-    updateData.updatedAt = Timestamp.now();
+    // Add updatedAt timestamp if there are changes
+     if (Object.keys(updateData).length > 0) {
+        updateData.updatedAt = Timestamp.now();
+     } else {
+         // If somehow we got here with no editable changes detected
+         setIsSaving(false);
+         onClose();
+         return;
+     }
 
     try {
       await updateDoc(taskRef, updateData);
-      onTaskUpdate(); // Notify parent component
+      onTaskUpdate(); // Notify parent component (e.g., for toast)
       onClose(); // Close modal
-      // Toast is handled in the parent via onTaskUpdate callback
     } catch (error) {
       console.error("Error updating task:", error);
       toast({ title: "Error", description: "Failed to save changes.", variant: "destructive" });
@@ -279,7 +311,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
 
   // Determine the current value for a field, prioritizing edited value
    const getCurrentValue = (fieldName: keyof Task) => {
-    return editedTask[fieldName] !== undefined ? editedTask[fieldName] : task[fieldName];
+    // Use nullish coalescing for cleaner fallback
+    return editedTask[fieldName] ?? task[fieldName];
   };
 
    const currentDueDate = getCurrentValue('dueDate');
@@ -318,7 +351,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
               {isEditable('assigneeId') && assigneeOptions.length > 0 ? (
                  <Select
                     name="assigneeId"
-                    value={(getCurrentValue('assigneeId') as string) || ''}
+                    value={(getCurrentValue('assigneeId') as string) || 'unassigned'} // Default to 'unassigned' if null/undefined
                     onValueChange={(value) => handleSelectChange('assigneeId', value === 'unassigned' ? null : value)}
                     disabled={!isEditable('assigneeId') || isSaving}
                   >
@@ -337,7 +370,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
               ) : (
                 <div className="flex items-center p-2 border rounded-md min-h-[40px] bg-muted/50">
                     <User className="w-4 h-4 mr-2 text-muted-foreground" />
-                    <span className="text-sm">{task.assigneeName || 'Unassigned'}</span>
+                    <span className="text-sm">{getCurrentValue('assigneeName') || 'Unassigned'}</span>
                 </div>
               )}
             </div>
@@ -361,7 +394,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                 </Select>
               ) : (
                  <div className="p-2 border rounded-md min-h-[40px] bg-muted/50 text-sm">
-                     {task.priority}
+                     {getCurrentValue('priority')}
                  </div>
               )}
             </div>
@@ -442,11 +475,11 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
             <Label>Comments</Label>
             <div className="mt-1 max-h-48 overflow-y-auto space-y-2 border rounded-md p-2 bg-muted/30">
               {comments.length === 0 && <p className="text-xs text-muted-foreground italic">No comments yet.</p>}
-              {comments.slice().reverse().map((comment) => ( // Show newest first
+              {comments.slice().sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()).map((comment) => ( // Sort by date descending
                 <div key={comment.id} className="text-sm border-b pb-1 last:border-b-0">
                   <p className="font-medium">{comment.userName}</p>
                   <p className="text-muted-foreground text-xs">{comment.createdAt.toDate().toLocaleString()}</p>
-                  <p className="mt-1">{comment.text}</p>
+                  <p className="mt-1 whitespace-pre-wrap break-words">{comment.text}</p>
                 </div>
               ))}
             </div>
@@ -476,7 +509,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
           </DialogClose>
           {/* Only show Save Changes if user can edit *something* other than comments/attachments */}
            {(userRole === 'manager' || userRole === 'owner') && (
-            <Button onClick={handleSaveChanges} disabled={isSaving || isUploading}>
+            <Button onClick={handleSaveChanges} disabled={isSaving || isUploading || !Object.keys(editedTask).some(key => isEditable(key as keyof Task))}>
               {isSaving ? 'Saving...' : 'Save Changes'}
             </Button>
            )}

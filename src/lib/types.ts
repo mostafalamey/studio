@@ -37,17 +37,28 @@ export interface Comment {
 }
 
 export interface Attachment {
-  id: string;
+  id: string; // Using Firestore document ID or Storage path as ID
   fileName: string;
   url: string; // URL to the file in Firebase Storage
   uploadedAt: Timestamp;
-  userId: string;
+  userId: string; // ID of the user who uploaded
 }
 
 export interface Column {
     id: ColumnId;
     title: string;
 }
+
+// Interface for user data stored in Firestore ('users' collection)
+export interface AppUser {
+  uid: string;
+  email: string | null;
+  displayName?: string | null;
+  role: UserRole;
+  createdAt: Timestamp;
+  // Add other user-specific fields if needed
+}
+
 
 // Initial columns setup
 export const initialColumns: Column[] = [
@@ -64,16 +75,16 @@ export function formatDueDate(timestamp: Timestamp | null): string {
   const date = timestamp.toDate();
   const day = date.getDate();
   const month = date.toLocaleString('default', { month: 'short' }).toUpperCase();
-  const yearLastTwo = date.getFullYear().toString().slice(-2); // Get last two digits of the year
+  // const yearLastTwo = date.getFullYear().toString().slice(-2); // Get last two digits of the year
 
   // Calculate the "L" value (Level/Week). This is a simple example, adjust logic as needed.
   // This example calculates the week number of the year.
-  const startOfYear = new Date(date.getFullYear(), 0, 1);
-  const diff = date.getTime() - startOfYear.getTime();
-  const oneDay = 1000 * 60 * 60 * 24;
-  const dayOfYear = Math.floor(diff / oneDay);
-  const weekNumber = Math.ceil((dayOfYear + startOfYear.getDay() + 1) / 7);
-  const level = `L${weekNumber}`;
+  // const startOfYear = new Date(date.getFullYear(), 0, 1);
+  // const diff = date.getTime() - startOfYear.getTime();
+  // const oneDay = 1000 * 60 * 60 * 24;
+  // const dayOfYear = Math.floor(diff / oneDay);
+  // const weekNumber = Math.ceil((dayOfYear + startOfYear.getDay() + 1) / 7);
+  // const level = `L${weekNumber}`;
 
 
   // return `${level}-${day} ${month} ${yearLastTwo}`; // Example: L40-5 OCT 23

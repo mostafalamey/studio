@@ -4,9 +4,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth, onAuthStateChanged, type User } from 'firebase/auth';
-import { getFirestore, type Firestore } from 'firebase/firestore';
+import { getFirestore, type Firestore, doc, getDoc, DocumentSnapshot } from 'firebase/firestore'; // Import Firestore functions
 import { getFunctions, type Functions } from 'firebase/functions';
 import { getStorage, type FirebaseStorage } from 'firebase/storage'; // Import getStorage
+import type { UserRole, AppUser } from '@/lib/types'; // Import UserRole and AppUser types
 
 // --- IMPORTANT ---
 // Ensure you have a .env.local file with your Firebase project credentials.
@@ -37,7 +38,7 @@ interface FirebaseContextValue {
   functions: Functions | null;
   user: User | null;
   loading: boolean;
-  userRole: 'employee' | 'manager' | 'owner' | null;
+  userRole: UserRole | null; // Use UserRole type
 }
 
 const FirebaseContext = createContext<FirebaseContextValue>({
@@ -67,6 +68,11 @@ if (typeof window !== 'undefined' && !getApps().length) {
       'Firebase initialization failed: NEXT_PUBLIC_FIREBASE_API_KEY is missing. ' +
       'Please ensure your environment variables are set up correctly in .env.local'
     );
+  } else if (!firebaseConfig.projectId) {
+      console.error(
+        'Firebase initialization failed: NEXT_PUBLIC_FIREBASE_PROJECT_ID is missing. ' +
+        'Please ensure your environment variables are set up correctly in .env.local'
+      );
   } else {
     try {
       app = initializeApp(firebaseConfig);
@@ -78,12 +84,29 @@ if (typeof window !== 'undefined' && !getApps().length) {
     } catch (error) {
       console.error("Firebase initialization error:", error);
       // The error might be due to invalid config values (e.g., projectId)
-      if (error instanceof Error && error.message.includes('Invalid API key')) {
-           console.error(
-             'Hint: The "Invalid API key" error often means the NEXT_PUBLIC_FIREBASE_API_KEY in your .env.local file is incorrect or missing.'
-           );
+      if (error instanceof Error) {
+          if (error.message.includes('Invalid API key')) {
+               console.error(
+                 'Hint: The "Invalid API key" error often means the NEXT_PUBLIC_FIREBASE_API_KEY in your .env.local file is incorrect or missing.'
+               );
+          }
+          if (error.message.includes('Firebase: Error (auth/invalid-api-key)')) {
+              console.error(
+                'Hint: The "auth/invalid-api-key" error often means the NEXT_PUBLIC_FIREBASE_API_KEY in your .env.local file is incorrect or missing, or not enabled for your project.'
+              );
+          }
+          if (error.message.includes('projectId')) {
+              console.error(
+                'Hint: Check if NEXT_PUBLIC_FIREBASE_PROJECT_ID in your .env.local file is correct.'
+              );
+          }
       }
       // Handle initialization error appropriately
+      app = null; // Ensure app is null if initialization fails
+      auth = null;
+      db = null;
+      functions = null;
+      storage = null;
     }
   }
 } else if (getApps().length > 0) {
@@ -97,12 +120,12 @@ if (typeof window !== 'undefined' && !getApps().length) {
 export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [userRole, setUserRole] = useState<'employee' | 'manager' | 'owner' | null>(null);
+  const [userRole, setUserRole] = useState<UserRole | null>(null); // Use UserRole type
 
   useEffect(() => {
     // If Firebase failed to initialize (e.g., missing API key), auth will be null.
-    if (!auth) {
-      console.warn("Firebase Auth is not available. User authentication will not work.");
+    if (!auth || !db) { // Also check for db
+      console.warn("Firebase Auth or Firestore is not available. User authentication and data fetching will not work.");
       setLoading(false);
       return;
     }
@@ -110,28 +133,41 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
+        setLoading(true); // Set loading true while fetching role
         try {
-          // Fetch user role (replace with your actual logic)
-          // This is a placeholder. You need to fetch the role from Firestore
-          // based on the currentUser.uid and set it using setUserRole.
-          // Example: const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-          // if (userDoc.exists()) setUserRole(userDoc.data().role);
-          setUserRole('manager'); // Placeholder: Set role based on your logic
-          console.log("User logged in:", currentUser.uid);
+          // Fetch user role from Firestore 'users' collection
+          const userDocRef = doc(db, 'users', currentUser.uid);
+          const userDocSnap: DocumentSnapshot<AppUser> = await getDoc(userDocRef) as DocumentSnapshot<AppUser>;
+
+          if (userDocSnap.exists()) {
+            const userData = userDocSnap.data();
+            setUserRole(userData?.role || null); // Set role from Firestore or null if missing
+            console.log("User logged in:", currentUser.uid, "Role:", userData?.role);
+          } else {
+            // Handle case where user exists in Auth but not in Firestore 'users' collection
+            console.warn(`User document not found in Firestore for UID: ${currentUser.uid}. Assigning default role 'employee'.`);
+            // Optionally create the document here or assign a default role
+             setUserRole('employee'); // Assign default or handle as error
+             // Example: Create user doc if missing (consider implications)
+             // await setDoc(userDocRef, { uid: currentUser.uid, email: currentUser.email, role: 'employee', createdAt: Timestamp.now() });
+          }
         } catch (error) {
           console.error("Error fetching user role:", error);
-          setUserRole(null);
+          setUserRole(null); // Set role to null on error
+        } finally {
+             setLoading(false); // Set loading false after fetching role or error
         }
       } else {
-        setUserRole(null);
+        setUserRole(null); // No user logged in
         console.log("User logged out");
+        setLoading(false); // Set loading false if no user
       }
-      setLoading(false);
+      // setLoading(false); // Moved loading(false) inside the if/else blocks
     });
 
     // Cleanup subscription on unmount
     return () => unsubscribe();
-  }, []); // Removed 'auth' dependency as it's initialized outside and won't change
+  }, []); // Dependencies remain empty as auth/db are initialized outside
 
   const value = {
     app,
@@ -143,6 +179,13 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     loading,
     userRole,
   };
+
+  // Render children only when Firebase is initialized and loading is complete,
+  // or if loading is specifically for role fetching after login.
+  // This basic check prevents rendering children if Firebase itself failed to init.
+  if (!app && loading) {
+      return <div>Error: Firebase failed to initialize. Check console and environment variables.</div>; // Or a proper loading/error component
+  }
 
   return (
     <FirebaseContext.Provider value={value}>
