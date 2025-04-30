@@ -200,15 +200,12 @@ const AppSidebar: React.FC<AppSidebarProps> = (/* { selectedProjectId, onSelectP
 
              <SidebarMenu>
                  {projectsLoading && (
-                    <>
-                       <SidebarMenuSkeleton showIcon />
-                       <SidebarMenuSkeleton showIcon />
-                       <SidebarMenuSkeleton showIcon />
-                    </>
+                    // Use React.Fragment with key or map over an array for multiple skeletons
+                    [1, 2, 3].map(i => <SidebarMenuSkeleton key={`skel-${i}`} showIcon />)
                  )}
-                 {projectsError && <p className="text-xs text-destructive px-2">Error loading projects.</p>}
+                 {projectsError && <p key="proj-error" className="text-xs text-destructive px-2">Error loading projects.</p>}
                   {!projectsLoading && !projectsError && projects?.length === 0 && (
-                      <p className="text-xs text-muted-foreground px-2 italic">No projects found.</p>
+                      <p key="proj-empty" className="text-xs text-muted-foreground px-2 italic">No projects found.</p>
                   )}
                   {projects?.map((project) => (
                   <SidebarMenuItem key={project.id}>
