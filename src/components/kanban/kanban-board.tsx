@@ -141,9 +141,9 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
   if (loading) {
      return (
         // Loading state with skeletons, maintaining the flex layout
-        <div className="flex-1 flex flex-wrap gap-4 p-4 md:p-6 overflow-y-auto">
+        <div className="flex-1 flex gap-4 p-4 md:p-6 overflow-hidden"> {/* Keep overflow hidden */}
           {initialColumns.map((column) => (
-             <div key={column.id} className="flex flex-col flex-1 min-w-[280px] bg-secondary/50 p-3 rounded-lg"> {/* Adjusted skeleton column bg */}
+             <div key={column.id} className="flex flex-col flex-1 min-w-0 bg-secondary/50 p-3 rounded-lg"> {/* Use min-w-0, keep flex-1 */}
                {/* Simplified Skeleton Header */}
                <div className="flex items-center justify-between mb-4">
                  <Skeleton className="h-5 w-1/3" />
@@ -164,7 +164,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
 
   return (
     <DndProvider backend={HTML5Backend}>
-       {/* Container uses flex-1 to fill space, overflow-y-auto for vertical scroll */}
+       {/* Container uses flex-1 to fill space, overflow-hidden for horizontal control */}
        <div className="flex flex-col flex-1 h-full overflow-hidden p-4 md:p-6">
          {/* Top Bar: Add Task Button (aligned right) */}
          {(userRole === 'manager' || userRole === 'owner') && (
@@ -176,8 +176,8 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
            </div>
          )}
 
-         {/* Kanban Columns Area - Flex container, now with wrapping and vertical scroll */}
-          <div className="flex flex-1 gap-4 overflow-y-auto pb-4"> {/* Allow vertical scroll, remove horizontal */}
+         {/* Kanban Columns Area - Flex container, no explicit horizontal scroll, allow vertical scroll on content */}
+          <div className="flex flex-1 gap-4 overflow-y-hidden pb-4"> {/* Use overflow-y-hidden here, columns manage their own scroll */}
             {initialColumns.map((column) => (
                 <KanbanColumn
                   key={column.id}
