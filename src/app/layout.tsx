@@ -24,7 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning={true}>{/* Add suppressHydrationWarning here */}
-      <body className={`${inter.variable} font-sans antialiased`}> {/* Use Inter font */}
+      <body className={`${inter.variable} font-sans antialiased`} suppressHydrationWarning={true}> {/* Use Inter font, add suppressHydrationWarning */}
         <FirebaseProvider>
           <SidebarProvider defaultOpen={true}> {/* Wrap with SidebarProvider */}
             <AppSidebar /> {/* Add the AppSidebar */}
