@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Sidebar,
   SidebarHeader,
@@ -36,7 +36,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton component
 import { Textarea } from "@/components/ui/textarea"; // Import Textarea
-import { useProjectContext } from '@/components/providers/project-provider'; // Import ProjectProvider and context hook
+import { useProjectContext } from '@/components/providers/project-provider'; // Corrected import path
 
 
 interface AppSidebarProps {}
@@ -61,12 +61,15 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
         // TODO: Filter projects based on employee assignment later
        projectsQuery = query(projectsCollection, orderBy('createdAt', 'desc'));
      } else {
+       // Handle cases where user role might not be set yet or is invalid
        projectsQuery = query(projectsCollection, where('__name__', '==', 'nonexistent'));
      }
    } else if (db) {
+       // If db exists but user doesn't (e.g., logged out), show no projects
        const projectsCollection = collection(db, 'projects') as CollectionReference<Project>;
        projectsQuery = query(projectsCollection, where('__name__', '==', 'nonexistent'));
    } else {
+       // If db doesn't exist (initial load?), set query to null
        projectsQuery = null;
    }
 
@@ -81,7 +84,8 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
     if (selectedProjectId === null && !projectsLoading && projects && projects.length > 0) {
       setSelectedProjectId(projects[0].id);
     }
-   }, [projects, projectsLoading, selectedProjectId, setSelectedProjectId]);
+     // Add a dependency on projects to re-run if the project list changes and no project is selected
+  }, [projects, projectsLoading, selectedProjectId, setSelectedProjectId]);
 
 
    const handleSelectProject = (projectId: string) => {
@@ -112,13 +116,15 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
         name: newProjectName.trim(),
         description: newProjectDescription.trim() || '',
         createdAt: Timestamp.now(),
-        createdBy: user.uid,
+        createdBy: user.uid, // Link project to the creator
+        // Add user roles or permissions if needed, e.g.,
+        // members: { [user.uid]: 'owner' } // Or 'manager' if creator is manager
       });
       toast({ title: "Project Created", description: `"${newProjectName}" added successfully.` });
       setNewProjectName('');
       setNewProjectDescription('');
       setIsAddProjectModalOpen(false);
-      handleSelectProject(docRef.id);
+      handleSelectProject(docRef.id); // Select the newly created project
     } catch (error) {
       console.error("Error adding project:", error);
       toast({ title: "Error", description: "Failed to create project.", variant: "destructive" });
@@ -200,31 +206,33 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
              )}
 
              <SidebarMenu>
-               {projectsLoading ? (
-                  // Skeletons
-                  [1, 2, 3].map(i => <SidebarMenuSkeleton key={`skel-${i}`} showIcon />)
-               ) : projectsError ? (
-                  // Error message
-                  <p key="proj-error" className="text-xs text-destructive px-2">Error: {projectsError.message}</p>
-               ) : projects && projects.length > 0 ? (
-                  // Project list
-                  projects.map((project) => (
-                      <SidebarMenuItem key={project.id}> {/* Use project.id as key */}
-                          <SidebarMenuButton
-                              onClick={() => handleSelectProject(project.id)}
-                              isActive={selectedProjectId === project.id} // Use context state for isActive
-                              tooltip={{ children: project.name }} // Show tooltip when collapsed
-                              className="justify-start group-data-[collapsible=icon]:justify-center"
-                          >
-                              <FolderKanban className="flex-shrink-0" />
-                              <span className="truncate">{project.name}</span>
-                          </SidebarMenuButton>
-                      </SidebarMenuItem>
-                  ))
-               ) : (
-                  // No projects message
-                  <p key="proj-empty" className="text-xs text-muted-foreground px-2 italic">No projects found.</p>
-               )}
+                {projectsLoading ? (
+                    // Skeletons
+                    [1, 2, 3].map(i => <SidebarMenuSkeleton key={`skel-${i}`} showIcon />)
+                ) : projectsError ? (
+                    // Error message
+                    <p key="proj-error" className="text-xs text-destructive px-2">Error loading projects</p> // Simplified error
+                 ) : !projects || projects.length === 0 ? (
+                     // No projects message
+                     <p key="proj-empty" className="text-xs text-muted-foreground px-2 italic">
+                          {userRole === 'manager' || userRole === 'owner' ? 'No projects yet. Add one!' : 'No projects found.'}
+                     </p>
+                 ) : (
+                     // Project list
+                     projects.map((project) => (
+                         <SidebarMenuItem key={project.id}> {/* Use project.id as key */}
+                             <SidebarMenuButton
+                                 onClick={() => handleSelectProject(project.id)}
+                                 isActive={selectedProjectId === project.id} // Use context state for isActive
+                                 tooltip={{ children: project.name }} // Show tooltip when collapsed
+                                 className="justify-start group-data-[collapsible=icon]:justify-center"
+                             >
+                                 <FolderKanban className="flex-shrink-0" />
+                                 <span className="truncate">{project.name}</span>
+                             </SidebarMenuButton>
+                         </SidebarMenuItem>
+                     ))
+                 )}
              </SidebarMenu>
          </SidebarGroup>
       </SidebarContent>
