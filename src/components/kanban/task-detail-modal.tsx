@@ -28,8 +28,8 @@ interface TaskDetailModalProps {
 // Define which fields are editable by whom
 const editableFieldsByRole: Record<UserRole, (keyof Task)[]> = {
   employee: ['columnId', 'comments', 'attachments'], // Employees can only add comments/attachments via dedicated inputs and change status via DnD
-  manager: ['title', 'dueDate', 'priority', 'assigneeId', 'comments', 'attachments', 'columnId'], // Managers can edit most fields
-  owner: ['title', 'dueDate', 'priority', 'assigneeId', 'comments', 'attachments', 'columnId'], // Owners have same edit rights as managers for tasks
+  manager: ['name', 'dueDate', 'priority', 'assigneeId', 'comments', 'attachments', 'columnId'], // Managers can edit most fields
+  owner: ['name', 'dueDate', 'priority', 'assigneeId', 'comments', 'attachments', 'columnId'], // Owners have same edit rights as managers for tasks
 };
 
 // Interface for user data used in the dropdown
@@ -323,20 +323,19 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>
-            {isEditable('title') ? (
-              <Input
-                name="title"
-                value={(getCurrentValue('title') as string) || ''}
-                onChange={handleInputChange}
-                className="text-lg font-semibold"
-                placeholder="Task Title"
-                disabled={!isEditable('title') || isSaving}
-              />
-            ) : (
-              <span className="text-lg font-semibold">{task.title}</span>
-            )}
-          </DialogTitle>
+          {/* Remove DialogTitle and use Input or span directly */}
+          {isEditable('name') ? (
+            <Input
+              name="name"
+              value={(getCurrentValue('name') as string) || ''}
+              onChange={handleInputChange}
+              className="text-lg font-semibold"
+              placeholder="Task Name"
+              disabled={!isEditable('name') || isSaving}
+            />
+          ) : (
+            <span className="text-lg font-semibold">{task.name}</span>
+          )}
           <DialogDescription>
             Manage task details, comments, and attachments.
           </DialogDescription>

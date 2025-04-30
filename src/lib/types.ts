@@ -9,14 +9,15 @@ export type ColumnId = 'todo' | 'ongoing' | 'done' | 'blocked';
 export interface Project {
   id: string;
   name: string;
+  description?: string; // Optional description
   createdAt: Timestamp;
-  // Add other project-specific fields if needed
+  createdBy: string; // User ID of the creator
 }
 
 export interface Task {
   id: string;
   projectId: string;
-  title: string;
+  name: string; // Renamed from title
   dueDate: Timestamp | null; // Storing as Timestamp for easier querying/sorting
   priority: Priority;
   assigneeId: string | null; // Store user ID

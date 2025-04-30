@@ -58,11 +58,13 @@ const KanbanCard: React.FC<KanbanCardProps> = ({ task, onClick }) => {
             "cursor-pointer", // Make it clear it's clickable
             isDragging ? 'opacity-50' : 'opacity-100'
         )}
-        aria-label={`Task: ${task.title}`}
+        aria-label={`Task: ${task.name}`} // Updated aria-label
      >
       <Card className="mb-2 shadow-sm hover:shadow-md transition-shadow duration-200 rounded-lg bg-card">
         <CardHeader className="p-3 pb-1">
-           <CardTitle className="text-sm font-medium leading-tight text-card-foreground">{task.title}</CardTitle>
+           {/* Remove CardTitle */}
+           {/* Use a simple paragraph or div for the name */}
+           <p className="text-sm font-medium leading-tight text-card-foreground">{task.name}</p>
         </CardHeader>
         <CardContent className="p-3 pt-1 pb-2 text-xs text-muted-foreground space-y-2">
           <div className="flex items-center space-x-2">
