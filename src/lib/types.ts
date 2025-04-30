@@ -17,7 +17,7 @@ export interface Project {
 
 export interface Task {
   id: string;
-  taskId: string; // Explicit task ID field
+  // taskId: string; // Remove explicit task ID field
   projectId: string;
   name: string; // Renamed from title
   dueDate: Timestamp | null; // Storing as Timestamp for easier querying/sorting

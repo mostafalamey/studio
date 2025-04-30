@@ -90,7 +90,7 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, projectId,
 
       await setDoc(newTaskRef, {
         id: newTaskId, // Store the generated ID within the document
-        taskId: newTaskId, // Add explicit taskId field
+        // taskId: newTaskId, // Remove explicit taskId field
         projectId: projectId,
         name: taskName.trim(),
         dueDate: dueDate ? Timestamp.fromDate(dueDate) : null,
