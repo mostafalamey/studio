@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -6,12 +7,15 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import KanbanColumn from './kanban-column';
 import { useFirebase } from '@/components/providers/firebase-provider';
 import { useCollectionData } from 'react-firebase-hooks/firestore';
-import { collection, query, where, orderBy, doc, updateDoc, FirestoreError, CollectionReference, Query } from 'firebase/firestore';
+import { collection, query, where, orderBy, doc, updateDoc, FirestoreError, CollectionReference, Query, Timestamp } from 'firebase/firestore'; // Added Timestamp
 import type { Task, ColumnId, Project, Column } from '@/lib/types'; // Import types
 import { initialColumns } from '@/lib/types'; // Import initial columns
 import TaskDetailModal from './task-detail-modal'; // Import the modal
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button'; // Import Button
+import { PlusCircle } from 'lucide-react'; // Import PlusCircle
+import AddTaskModal from './add-task-modal'; // Import AddTaskModal
 
 interface KanbanBoardProps {
   projectId: string;
@@ -21,7 +25,8 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
   const { db, user, userRole } = useFirebase();
   const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false); // State for add task modal
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   // Firestore query for tasks
@@ -35,10 +40,11 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
         orderBy('createdAt', 'asc') // Example ordering, adjust as needed
     );
 
-    // Further filter for employees if needed (though handled by DnD restrictions primarily)
-    // if (userRole === 'employee' && user) {
-    //   tasksQuery = query(tasksQuery, where('assigneeId', '==', user.uid));
-    // }
+    // Filter for employees: show only tasks assigned to them
+    if (userRole === 'employee' && user) {
+        // Modify the query to filter by assigneeId
+        tasksQuery = query(tasksQuery, where('assigneeId', '==', user.uid));
+    }
   }
 
 
@@ -51,7 +57,11 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
     if (tasksData) {
       setTasks(tasksData);
     }
-  }, [tasksData]);
+     // Clear tasks when projectId changes to avoid showing stale data
+     return () => {
+       setTasks([]);
+     };
+  }, [tasksData, projectId]); // Add projectId as dependency
 
   const handleDropTask = async (taskId: string, newColumnId: ColumnId) => {
     if (!db) return;
@@ -71,7 +81,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
 
     const taskRef = doc(db, 'tasks', taskId);
     try {
-      await updateDoc(taskRef, { columnId: newColumnId, updatedAt: new Date() });
+      await updateDoc(taskRef, { columnId: newColumnId, updatedAt: Timestamp.now() }); // Use Timestamp.now()
       // Optimistic update (already handled by react-firebase-hooks)
        toast({
          title: "Task Moved",
@@ -89,15 +99,24 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
     }
   };
 
-  const openTaskModal = (task: Task) => {
+  const openTaskDetailModal = (task: Task) => {
     setSelectedTask(task);
-    setIsModalOpen(true);
+    setIsDetailModalOpen(true);
   };
 
-  const closeTaskModal = () => {
-    setIsModalOpen(false);
+  const closeTaskDetailModal = () => {
+    setIsDetailModalOpen(false);
     setSelectedTask(null);
   };
+
+   const openAddTaskModal = () => {
+    setIsAddModalOpen(true);
+  };
+
+  const closeAddTaskModal = () => {
+    setIsAddModalOpen(false);
+  };
+
 
    const handleTaskUpdate = () => {
      // This function will be called by the modal on successful update
@@ -106,14 +125,17 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
      // No need to manually refetch, react-firebase-hooks handles it.
    };
 
+   const handleTaskAdd = (newTaskName: string) => {
+    toast({ title: "Task Added", description: `"${newTaskName}" created successfully.` });
+    // No need to refetch, react-firebase-hooks handles it.
+    closeAddTaskModal();
+  };
+
 
   if (loading) {
      return (
        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 md:p-6">
-         <Skeleton className="h-64 rounded-lg" />
-         <Skeleton className="h-64 rounded-lg" />
-         <Skeleton className="h-64 rounded-lg" />
-         <Skeleton className="h-64 rounded-lg" />
+         {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-96 rounded-lg" />)}
        </div>
      );
    }
@@ -124,27 +146,48 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="flex space-x-4 overflow-x-auto p-4 md:p-6 flex-1">
+      {/* Add Task Button for Managers/Owners */}
+      {(userRole === 'manager' || userRole === 'owner') && (
+        <div className="px-4 md:px-6 pt-4 mb-4">
+          <Button onClick={openAddTaskModal}>
+            <PlusCircle className="w-4 h-4 mr-2" />
+            Add Task
+          </Button>
+        </div>
+      )}
+      {/* Responsive Grid Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 p-4 md:p-6">
         {initialColumns.map((column) => (
           <KanbanColumn
             key={column.id}
             column={column}
             tasks={tasks.filter((task) => task.columnId === column.id)}
             onDropTask={handleDropTask}
-            onTaskClick={openTaskModal} // Pass the click handler
+            onTaskClick={openTaskDetailModal} // Pass the click handler
           />
         ))}
       </div>
+       {/* Task Detail Modal */}
        {selectedTask && (
          <TaskDetailModal
-           isOpen={isModalOpen}
-           onClose={closeTaskModal}
+           isOpen={isDetailModalOpen}
+           onClose={closeTaskDetailModal}
            task={selectedTask}
            onTaskUpdate={handleTaskUpdate} // Pass update handler
          />
        )}
+        {/* Add Task Modal */}
+       {isAddModalOpen && (
+        <AddTaskModal
+          isOpen={isAddModalOpen}
+          onClose={closeAddTaskModal}
+          projectId={projectId}
+          onTaskAdd={handleTaskAdd}
+        />
+      )}
     </DndProvider>
   );
 };
 
 export default KanbanBoard;
+
