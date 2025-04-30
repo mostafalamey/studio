@@ -36,7 +36,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton component
 import { Textarea } from "@/components/ui/textarea"; // Import Textarea
-import { useProjectContext } from '@/components/providers/project-provider'; // Corrected import path
+import { useProjectContext } from '@/components/providers/project-provider'; // Import project context
 
 
 interface AppSidebarProps {}
@@ -209,19 +209,7 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
                  ) : (
                      // Project list
                      <>
-                        {/* Static "View All Projects" Item */}
-                        <SidebarMenuItem key="view-all-projects">
-                           <SidebarMenuButton
-                               onClick={() => handleSelectProject(null)} // Or navigate to an "all projects" view
-                               isActive={selectedProjectId === null} // Active when no specific project is selected
-                               tooltip={{ children: "View All Projects Overview" }}
-                               className="justify-start group-data-[collapsible=icon]:justify-center"
-                           >
-                               <FileText className="flex-shrink-0" />
-                               <span className="truncate">View All Projects</span>
-                           </SidebarMenuButton>
-                        </SidebarMenuItem>
-
+                        {/* Removed "View All Projects" Item */}
                          {projects.map((project) => (
                              <SidebarMenuItem key={project.id}> {/* Use project.id as key */}
                                  <SidebarMenuButton

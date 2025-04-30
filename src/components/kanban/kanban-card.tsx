@@ -96,9 +96,9 @@ const KanbanCard: React.FC<KanbanCardProps> = ({ task, onClick }) => {
             "mb-2 shadow-sm hover:shadow-md transition-shadow duration-200 rounded-lg bg-card border-l-4",
             priorityBorderStyles[task.priority] // Apply dynamic border color
         )}>
-        <CardHeader className="p-3 pb-1 flex flex-row justify-between items-center">
+        <CardHeader className="p-3 pb-1 flex flex-row justify-between items-start"> {/* items-start to align badge and avatar top */}
             {/* Task Short ID Badge */}
-           <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300 px-1.5 py-0.5">
+           <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300 px-1.5 py-0.5 self-start"> {/* self-start for top alignment */}
               {taskShortId}
            </Badge>
             {/* Assignee Avatar (moved to header) */}
@@ -116,8 +116,15 @@ const KanbanCard: React.FC<KanbanCardProps> = ({ task, onClick }) => {
         <CardContent className="p-3 pt-0 pb-2 space-y-1">
           {/* Task Name */}
            <p className="text-sm font-medium leading-snug text-card-foreground break-words">{task.name}</p>
+            {/* Priority Badge */}
+            <Badge variant="secondary" className={cn(
+              "text-xs font-medium px-1.5 py-0.5 rounded capitalize",
+              priorityBadgeStyles[task.priority]
+            )}>
+              {task.priority}
+            </Badge>
           {/* Date */}
-           <div className="flex items-center space-x-1 text-xs text-muted-foreground">
+           <div className="flex items-center space-x-1 text-xs text-muted-foreground pt-1">
               <CalendarDays className="w-3 h-3" />
               <span>{formatDueDate(task.dueDate, 'yyyy-MM-dd')}</span> {/* Format date as YYYY-MM-DD */}
            </div>
