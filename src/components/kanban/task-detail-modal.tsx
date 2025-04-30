@@ -341,8 +341,23 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
     // Consider implementing this if orphaned files are a concern.
 
     try {
+      // First delete attachments from storage
+      for (const attachment of attachments) {
+        try {
+          const attachmentRef = ref(storage, attachment.id);
+          await deleteObject(attachmentRef);
+          console.log(`Deleted attachment from storage: ${attachment.fileName}`);
+        } catch (storageError) {
+          // Log error but continue trying to delete the task doc
+          console.error(`Error deleting attachment ${attachment.fileName} from storage:`, storageError);
+          // Optionally notify user that specific attachment deletion failed
+          // toast({ title: "Attachment Deletion Warning", description: `Could not delete file ${attachment.fileName} from storage.`, variant: "default" });
+        }
+      }
+
+      // Then delete the Firestore document
       await deleteDoc(taskRef);
-      toast({ title: "Task Deleted", description: `Task "${task.name}" was successfully deleted.` });
+      toast({ title: "Task Deleted", description: `Task "${task.name}" and its attachments were successfully deleted.` });
       onClose(); // Close the modal after deletion
     } catch (error) {
       console.error("Error deleting task:", error);
@@ -367,19 +382,21 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
         <DialogHeader>
-          {/* Remove DialogTitle and use Input or span directly */}
-          {isEditable('name') ? (
-            <Input
-              name="name"
-              value={(getCurrentValue('name') as string) || ''}
-              onChange={handleInputChange}
-              className="text-lg font-semibold"
-              placeholder="Task Name"
-              disabled={!isEditable('name') || isSaving || isDeleting}
-            />
-          ) : (
-            <span className="text-lg font-semibold">{task.name}</span>
-          )}
+          {/* Wrap Input/span in DialogTitle */}
+           <DialogTitle>
+              {isEditable('name') ? (
+                <Input
+                  name="name"
+                  value={(getCurrentValue('name') as string) || ''}
+                  onChange={handleInputChange}
+                  className="text-lg font-semibold border-none p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0" // Style to look like text
+                  placeholder="Task Name"
+                  disabled={!isEditable('name') || isSaving || isDeleting}
+                />
+              ) : (
+                <span className="text-lg font-semibold">{task.name}</span>
+              )}
+           </DialogTitle>
           <DialogDescription>
             Manage task details, comments, and attachments.
           </DialogDescription>
@@ -562,7 +579,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
                       This action cannot be undone. This will permanently delete the task
-                      "{task.name}". Associated comments and attachments might also be removed (depending on storage rules).
+                      "{task.name}" and all associated attachments.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -570,7 +587,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                     <AlertDialogAction
                        onClick={handleDeleteTask}
                        disabled={isDeleting}
-                       className={buttonVariants({ variant: "destructive" })} // Ensure destructive style
+                       className={cn(buttonVariants({ variant: "destructive" }))} // Ensure destructive style
                      >
                       {isDeleting ? 'Deleting...' : 'Delete Task'}
                     </AlertDialogAction>
@@ -599,4 +616,3 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
 };
 
 export default TaskDetailModal;
-
