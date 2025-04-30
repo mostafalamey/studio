@@ -37,7 +37,7 @@ interface FirebaseContextValue {
   storage: FirebaseStorage | null; // Add storage
   functions: Functions | null;
   user: User | null;
-  loading: boolean;
+  loading: boolean; // Represents auth loading state
   userRole: UserRole | null; // Use UserRole type
 }
 
@@ -48,7 +48,7 @@ const FirebaseContext = createContext<FirebaseContextValue>({
   storage: null, // Initialize storage as null
   functions: null,
   user: null,
-  loading: true,
+  loading: true, // Auth state initially loading
   userRole: null,
 });
 
@@ -62,7 +62,6 @@ let storage: FirebaseStorage | null = null; // Variable for storage
 
 // Initialize Firebase only once
 if (typeof window !== 'undefined' && !getApps().length) {
-  // Check if the essential API key is provided
   if (!firebaseConfig.apiKey) {
     console.error(
       'Firebase initialization failed: NEXT_PUBLIC_FIREBASE_API_KEY is missing. ' +
@@ -83,7 +82,6 @@ if (typeof window !== 'undefined' && !getApps().length) {
       console.log("Firebase Initialized");
     } catch (error) {
       console.error("Firebase initialization error:", error);
-      // The error might be due to invalid config values (e.g., projectId)
       if (error instanceof Error) {
           if (error.message.includes('Invalid API key')) {
                console.error(
@@ -101,8 +99,7 @@ if (typeof window !== 'undefined' && !getApps().length) {
               );
           }
       }
-      // Handle initialization error appropriately
-      app = null; // Ensure app is null if initialization fails
+      app = null;
       auth = null;
       db = null;
       functions = null;
@@ -110,83 +107,98 @@ if (typeof window !== 'undefined' && !getApps().length) {
     }
   }
 } else if (getApps().length > 0) {
+  // Ensure instances are grabbed if app already exists (e.g., HMR)
   app = getApps()[0];
   auth = getAuth(app);
   db = getFirestore(app);
   functions = getFunctions(app);
-  storage = getStorage(app); // Get storage instance if app already exists
+  storage = getStorage(app);
 }
 
 export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [userRole, setUserRole] = useState<UserRole | null>(null); // Use UserRole type
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [isClientChecked, setIsClientChecked] = useState(false); // Track client-side readiness
+  const [authLoading, setAuthLoading] = useState(true); // Track auth state loading
 
   useEffect(() => {
-    // If Firebase failed to initialize (e.g., missing API key), auth will be null.
-    if (!auth || !db) { // Also check for db
-      console.warn("Firebase Auth or Firestore is not available. User authentication and data fetching will not work.");
-      setLoading(false);
+    // This effect runs only on the client
+    setIsClientChecked(true);
+
+    // Check if Firebase instances are valid before subscribing
+    if (!auth || !db) {
+      console.warn("Firebase Auth or Firestore is not available. Authentication and data fetching will not work.");
+      setAuthLoading(false); // Auth check is "done" (failed)
       return;
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        setLoading(true); // Set loading true while fetching role
+        // Fetch role only if user is logged in
         try {
-          // Fetch user role from Firestore 'users' collection
           const userDocRef = doc(db, 'users', currentUser.uid);
-          const userDocSnap: DocumentSnapshot<AppUser> = await getDoc(userDocRef) as DocumentSnapshot<AppUser>;
+          const userDocSnap = await getDoc(userDocRef) as DocumentSnapshot<AppUser>;
 
           if (userDocSnap.exists()) {
             const userData = userDocSnap.data();
-            setUserRole(userData?.role || null); // Set role from Firestore or null if missing
+            setUserRole(userData?.role || null);
             console.log("User logged in:", currentUser.uid, "Role:", userData?.role);
           } else {
-            // Handle case where user exists in Auth but not in Firestore 'users' collection
             console.warn(`User document not found in Firestore for UID: ${currentUser.uid}. Assigning default role 'employee'.`);
-            // Optionally create the document here or assign a default role
-             setUserRole('employee'); // Assign default or handle as error
-             // Example: Create user doc if missing (consider implications)
+             // Handle missing user doc - assign default or log error
+             // Example: Create user doc if missing (consider security implications)
              // await setDoc(userDocRef, { uid: currentUser.uid, email: currentUser.email, role: 'employee', createdAt: Timestamp.now() });
+             setUserRole('employee'); // Assign default role
           }
         } catch (error) {
           console.error("Error fetching user role:", error);
           setUserRole(null); // Set role to null on error
         } finally {
-             setLoading(false); // Set loading false after fetching role or error
+           setAuthLoading(false); // Auth check complete (success or fail)
         }
       } else {
-        setUserRole(null); // No user logged in
+        // No user logged in
+        setUserRole(null);
         console.log("User logged out");
-        setLoading(false); // Set loading false if no user
+        setAuthLoading(false); // Auth check complete (no user)
       }
-      // setLoading(false); // Moved loading(false) inside the if/else blocks
     });
 
     // Cleanup subscription on unmount
     return () => unsubscribe();
-  }, []); // Dependencies remain empty as auth/db are initialized outside
+  }, []); // Empty dependency array ensures this runs once on client mount
 
   const value = {
     app,
     auth,
     db,
-    storage, // Provide storage
+    storage,
     functions,
     user,
-    loading,
+    loading: authLoading, // Expose authLoading state as 'loading'
     userRole,
   };
 
-  // Render children only when Firebase is initialized and loading is complete,
-  // or if loading is specifically for role fetching after login.
-  // This basic check prevents rendering children if Firebase itself failed to init.
-  if (!app && loading) {
-      return <div>Error: Firebase failed to initialize. Check console and environment variables.</div>; // Or a proper loading/error component
+  // During SSR and initial client render before useEffect runs, isClientChecked is false.
+  // Render null or a consistent placeholder to prevent hydration mismatch.
+  if (!isClientChecked) {
+    // Return null or a simple, non-interactive placeholder.
+    // This MUST be consistent between server and initial client render.
+    return null;
+    // Example placeholder (ensure it doesn't cause hydration issues itself):
+    // return <div className="loading-placeholder">Loading Firebase...</div>;
   }
 
+  // After the client check, if Firebase core instances are still null (initialization failed), show error.
+  // This check runs *after* hydration, so it won't cause mismatch if config is correct.
+  if (!app || !auth || !db) {
+      // Log the config being used for easier debugging
+      // console.log('Firebase Config Used:', firebaseConfig);
+      return <div>Error: Firebase failed to initialize. Check console and ensure environment variables (NEXT_PUBLIC_FIREBASE_...) are correctly set in .env.local</div>;
+  }
+
+  // Once client is checked and Firebase is initialized, provide context and render children.
   return (
     <FirebaseContext.Provider value={value}>
       {children}
