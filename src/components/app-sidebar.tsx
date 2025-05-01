@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { LogOut, FolderKanban, PlusCircle, LayoutDashboard, Users, FileText } from 'lucide-react'; // Added icons
 import { useFirebase } from '@/components/providers/firebase-provider';
 import { useCollectionData } from 'react-firebase-hooks/firestore';
-import { collection, query, orderBy, where, addDoc, Timestamp, FirestoreError, CollectionReference, Query, FieldPath } from 'firebase/firestore'; // Added FieldPath
+import { collection, query, orderBy, where, addDoc, Timestamp, FirestoreError, CollectionReference, Query, FieldPath, doc, setDoc } from 'firebase/firestore'; // Added FieldPath, doc, setDoc
 import type { Project, UserRole } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -34,9 +34,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton component
-import { Textarea } from "@/components/ui/textarea"; // Import Textarea
-import { useProjectContext } from '@/components/providers/project-provider'; // Import ProjectProvider and context hook
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { useProjectContext } from '@/components/providers/project-provider';
 
 
 interface AppSidebarProps {}
@@ -48,11 +48,9 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectDescription, setNewProjectDescription] = useState('');
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
-  // Use context for selectedProjectId state
   const { selectedProjectId, setSelectedProjectId } = useProjectContext();
 
    // --- Project Fetching Logic ---
-   // Use useState to hold the query, allowing it to be null initially or on error
    const [projectsQuery, setProjectsQuery] = useState<Query | null>(null);
 
    useEffect(() => {
@@ -61,16 +59,19 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
             let q: Query | null = null;
              try {
                 if (userRole === 'manager' || userRole === 'owner') {
+                    console.log("Fetching projects for Manager/Owner");
                     // Managers and Owners see all projects
                     q = query(projectsCollection, orderBy('createdAt', 'desc'));
                 } else if (userRole === 'employee') {
+                    console.log(`Fetching projects for Employee: ${user.uid}`);
                     // Employees see projects where they are in the 'assignedUsers' array
                     q = query(
                         projectsCollection,
-                        where('assignedUsers', 'array-contains', user.uid),
+                        where('assignedUsers', 'array-contains', user.uid), // Ensure user.uid is correctly passed
                         orderBy('createdAt', 'desc')
                     );
                  } else {
+                     console.log(`Fetching projects for unknown/invalid role: ${userRole}`);
                      // Handle cases where user role might not be set yet or is invalid
                      // Query for a non-existent document ID to return nothing
                      q = query(projectsCollection, where('__name__', '==', 'nonexistent'));
@@ -87,10 +88,12 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
              }
              setProjectsQuery(q);
         } else if (db) {
+            console.log("Fetching projects: No user logged in.");
             // If db exists but user doesn't (e.g., logged out), show no projects
             const projectsCollection = collection(db, 'projects') as CollectionReference<Project>;
             setProjectsQuery(query(projectsCollection, where('__name__', '==', 'nonexistent')));
         } else {
+             console.log("Fetching projects: DB not available.");
              // If db doesn't exist (initial load?), set query to null
              setProjectsQuery(null);
         }
@@ -102,6 +105,14 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
      snapshotListenOptions: { includeMetadataChanges: true },
      idField: 'id',
    });
+
+   // Log fetched projects for debugging
+   useEffect(() => {
+       if (!projectsLoading && projects) {
+           console.log("Fetched projects:", projects);
+       }
+   }, [projects, projectsLoading]);
+
 
    // Log Firestore errors specifically
    useEffect(() => {
@@ -141,7 +152,10 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
 
     try {
       const projectsCollection = collection(db, 'projects');
-      const docRef = await addDoc(projectsCollection, {
+      // Use doc() without an ID to get an auto-generated ID, then set()
+      const newProjectRef = doc(projectsCollection);
+      await setDoc(newProjectRef, {
+        id: newProjectRef.id, // Store the generated ID within the document
         name: newProjectName.trim(),
         description: newProjectDescription.trim() || '',
         createdAt: Timestamp.now(),
@@ -152,7 +166,7 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
       setNewProjectName('');
       setNewProjectDescription('');
       setIsAddProjectModalOpen(false);
-      handleSelectProject(docRef.id); // Select the newly created project
+      handleSelectProject(newProjectRef.id); // Select the newly created project
     } catch (error) {
       console.error("Error adding project:", error);
       toast({ title: "Error", description: "Failed to create project.", variant: "destructive" });
