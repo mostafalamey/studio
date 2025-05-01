@@ -397,14 +397,16 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
            {/* Input or Span for Title */}
            {/* Conditionally render Input based on editability */}
             {isEditable('name') ? (
-              <Input
-                name="name"
-                value={(getCurrentValue('name') as string) || ''}
-                onChange={handleInputChange}
-                className="text-lg font-semibold h-auto focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0" // More standard input look
-                placeholder="Task Name"
-                disabled={!isEditable('name') || isSaving || isDeleting}
-              />
+              <DialogTitle>
+                  <Input
+                    name="name"
+                    value={(getCurrentValue('name') as string) || ''}
+                    onChange={handleInputChange}
+                    className="text-lg font-semibold h-auto focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0" // More standard input look
+                    placeholder="Task Name"
+                    disabled={!isEditable('name') || isSaving || isDeleting}
+                  />
+              </DialogTitle>
             ) : (
               <DialogTitle>{task.name}</DialogTitle> // Non-editable display
             )}
