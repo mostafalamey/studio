@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -63,25 +62,6 @@ const KanbanCard: React.FC<KanbanCardProps> = ({ task, onClick }) => {
      return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
   };
 
-   // Generate a consistent, somewhat unique task identifier (e.g., U1, U2)
-   // This is a simple example, might need refinement for uniqueness across projects/time
-    const generateTaskShortId = (taskId: string) => {
-        // Use a simple hash or part of the ID for display
-        // Warning: This is NOT guaranteed to be unique and is just for visual similarity to the image
-        let hash = 0;
-        for (let i = 0; i < taskId.length; i++) {
-            const char = taskId.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash |= 0; // Convert to 32bit integer
-        }
-        // Take absolute value and modulo to get a somewhat consistent number
-        const num = Math.abs(hash) % 1000; // Example: Limit to U0 - U999
-        return `U${num}`;
-    };
-
-    const taskShortId = generateTaskShortId(task.id);
-
-
   return (
     <div ref={drag} // Attach drag ref here
         onClick={onClick} // Attach onClick handler
@@ -96,11 +76,7 @@ const KanbanCard: React.FC<KanbanCardProps> = ({ task, onClick }) => {
             "mb-2 shadow-sm hover:shadow-md transition-shadow duration-200 rounded-lg bg-card border-l-4",
             priorityBorderStyles[task.priority] // Apply dynamic border color
         )}>
-        <CardHeader className="p-3 pb-1 flex flex-row justify-between items-start"> {/* items-start to align badge and avatar top */}
-            {/* Task Short ID Badge */}
-           <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300 px-1.5 py-0.5 self-start"> {/* self-start for top alignment */}
-              {taskShortId}
-           </Badge>
+        <CardHeader className="p-3 pb-1 flex flex-row justify-end items-start"> {/* Removed justify-between, only avatar remains */}
             {/* Assignee Avatar (moved to header) */}
            <Avatar className="h-6 w-6" title={`Assigned to: ${task.assigneeName || 'Unassigned'}`}>
              {/* Add AvatarImage if you store profile picture URLs */}
