@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useFirebase } from '@/components/providers/firebase-provider';
 import { useCollectionData } from 'react-firebase-hooks/firestore';
-import { collection, query, orderBy, addDoc, Timestamp, serverTimestamp, doc, setDoc, getDoc, CollectionReference, Query } from 'firebase/firestore'; // Added CollectionReference, Query
+import { collection, query, orderBy, Timestamp, serverTimestamp, doc, setDoc, getDoc, CollectionReference, Query } from 'firebase/firestore'; // Removed addDoc, use setDoc instead
 import type { ChatMessage } from '@/lib/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -40,7 +40,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
     };
 
     const chatDocPath = getChatDocPath();
-    console.log(`[ChatInterface Debug] Chat Doc Path: ${chatDocPath}, Target ID: ${targetId}, Target Type: ${targetType}`); // Log chat path
+    // console.log(`[ChatInterface Debug] Chat Doc Path: ${chatDocPath}, Target ID: ${targetId}, Target Type: ${targetType}`); // Log chat path
 
     // Ensure the chat document exists (especially for user-to-user)
     useEffect(() => {
@@ -58,46 +58,46 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
                         lastMessageAt: serverTimestamp(), // Initialize last message timestamp
                         type: 'user' // Mark as user chat
                     });
-                    console.log(`[ChatInterface Debug] Created chat document: ${chatDocPath}`);
+                    // console.log(`[ChatInterface Debug] Created chat document: ${chatDocPath}`);
                 } else {
-                    console.log(`[ChatInterface Debug] Chat document already exists: ${chatDocPath}`);
+                    // console.log(`[ChatInterface Debug] Chat document already exists: ${chatDocPath}`);
                 }
             } catch (error) {
                 console.error("[ChatInterface Debug] Error ensuring chat document exists:", error);
             }
         };
         ensureChatDoc();
-    }, [db, chatDocPath, targetType, user?.uid, targetId, user]); // Removed user from dep array as user.uid is used
+    }, [db, chatDocPath, targetType, user?.uid, targetId]); // Simplified dependency array
 
 
      // Query for messages - Use three-argument form of collection()
      // Ensure chatDocPath is not null before creating the collection reference
      const messagesCollectionRef = db && chatDocPath ? collection(db, chatDocPath, 'messages') : null;
      const messagesQuery = messagesCollectionRef ? query(messagesCollectionRef, orderBy('createdAt', 'asc')) : null;
-     console.log(`[ChatInterface Debug] Messages Query constructed: ${messagesQuery ? 'Yes' : 'No'}`); // Log if query is built
+     // console.log(`[ChatInterface Debug] Messages Query constructed: ${messagesQuery ? 'Yes' : 'No'}`); // Log if query is built
 
 
     const [messages, loading, error] = useCollectionData<ChatMessage>(messagesQuery as Query<ChatMessage> | null, { // Explicit type assertion
         snapshotListenOptions: { includeMetadataChanges: true },
-        idField: 'id'
+        idField: 'id' // Automatically adds document ID to the data object, BUT might cause issues if 'id' field doesn't exist initially. Re-added idField here based on earlier error fix.
     });
 
 
     // Debugging logs for messages
     useEffect(() => {
-        console.log(`[ChatInterface Debug] Messages Loading: ${loading}`);
+        // console.log(`[ChatInterface Debug] Messages Loading: ${loading}`);
         if (error) {
             console.error("[ChatInterface Debug] Messages Error:", error);
         }
         // Log the actual messages array
-        console.log("[ChatInterface Debug] Fetched Messages Array:", messages);
+        // console.log("[ChatInterface Debug] Fetched Messages Array:", messages);
     }, [messages, loading, error]);
 
 
     useEffect(() => {
         // Scroll to bottom when new messages arrive or loading finishes
         if (!loading) {
-            console.log("[ChatInterface Debug] Scrolling to bottom.");
+            // console.log("[ChatInterface Debug] Scrolling to bottom.");
             messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
         }
     }, [messages, loading]);
@@ -105,12 +105,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!db || !user || !newMessage.trim() || !chatDocPath) {
-             console.warn("[ChatInterface Debug] Send message aborted: Missing db, user, message, or chatDocPath.");
+             // console.warn("[ChatInterface Debug] Send message aborted: Missing db, user, message, or chatDocPath.");
              return;
          }
 
         setIsSending(true);
-        const messageData: Omit<ChatMessage, 'id'> = {
+
+        // 1. Get the messages subcollection reference
+        const messagesSubCollectionRef = collection(db, chatDocPath, 'messages');
+        // 2. Generate a new document reference within the subcollection to get an ID
+        const newMessageRef = doc(messagesSubCollectionRef);
+        // 3. Get the unique ID from the reference
+        const newId = newMessageRef.id;
+
+        // 4. Prepare the message data including the generated ID
+        const messageData: ChatMessage = {
+            id: newId, // Include the generated ID in the document data
             senderId: user.uid,
             senderName: user.displayName || user.email || 'Anonymous',
             text: newMessage.trim(),
@@ -118,17 +128,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
         };
 
         try {
-            const messagesCollectionRef = collection(db, chatDocPath, 'messages'); // Correct path for subcollection
-            await addDoc(messagesCollectionRef, messageData);
-            console.log(`[ChatInterface Debug] Message sent to ${chatDocPath}/messages`);
-
+            // 5. Use setDoc with the generated reference to save the message
+            await setDoc(newMessageRef, messageData);
+            // console.log(`[ChatInterface Debug] Message sent to ${chatDocPath}/messages with ID ${newId}`);
 
             // Update last message timestamp on the parent chat document
              const chatDocRef = doc(db, chatDocPath);
              // Ensure type is always set/updated along with lastMessageAt
              await setDoc(chatDocRef, { lastMessageAt: Timestamp.now(), type: targetType }, { merge: true });
-             console.log(`[ChatInterface Debug] Updated lastMessageAt for ${chatDocPath}`);
-
+             // console.log(`[ChatInterface Debug] Updated lastMessageAt for ${chatDocPath}`);
 
             setNewMessage('');
         } catch (err) {
@@ -171,7 +179,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
                 {messages?.map((msg) => {
                      // Ensure msg and msg.id are valid before rendering
                     if (!msg || !msg.id) {
-                        console.warn("[ChatInterface Debug] ChatMessage missing or has no id:", msg);
+                        // console.warn("[ChatInterface Debug] ChatMessage missing or has no id:", msg);
                         return null; // Skip rendering this message if id is missing
                     }
                     const isSender = msg.senderId === user?.uid;
@@ -225,3 +233,5 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
 };
 
 export default ChatInterface;
+
+    
