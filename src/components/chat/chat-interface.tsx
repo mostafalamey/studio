@@ -134,8 +134,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
                     <p className="text-muted-foreground text-center italic">No messages yet. Start the conversation!</p>
                 )}
                 {messages?.map((msg) => {
+                    // Ensure msg and msg.id are valid before rendering
+                    if (!msg || !msg.id) {
+                        console.warn("ChatMessage missing or has no id:", msg);
+                        return null; // Skip rendering this message if id is missing
+                    }
                     const isSender = msg.senderId === user?.uid;
                     return (
+                        // Use msg.id as the key, which should be unique
                         <div key={msg.id} className={`flex items-end space-x-2 ${isSender ? 'justify-end' : 'justify-start'}`}>
                              {!isSender && (
                                 <Avatar className="h-6 w-6 self-start flex-shrink-0"> {/* Prevent avatar shrinking */}
