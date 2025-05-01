@@ -74,6 +74,15 @@ export interface Team {
     // Add other team-specific fields if needed, e.g., description, team lead ID
 }
 
+// Interface for chat messages stored in Firestore ('chats/{chatId}/messages')
+export interface ChatMessage {
+    id: string; // Firestore document ID
+    senderId: string; // AppUser.uid
+    senderName: string; // Denormalized for display
+    text: string;
+    createdAt: Timestamp;
+}
+
 
 // Initial columns setup
 export const initialColumns: Column[] = [

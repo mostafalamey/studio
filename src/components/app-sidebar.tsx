@@ -407,7 +407,7 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
                  <DialogTrigger asChild>
                     <Button
                        variant="default"
-                       className="w-full justify-center h-9 mb-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0 bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                       className="w-full justify-center h-9 mb-6 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0 bg-destructive hover:bg-destructive/90 text-destructive-foreground"
                        title="Add Project"
                      >
                      <PlusCircle className="w-4 h-4 mr-2 group-data-[collapsible=icon]:mr-0" />
