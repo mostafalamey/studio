@@ -1,10 +1,9 @@
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useFirebase } from '@/components/providers/firebase-provider';
 import { useCollectionData } from 'react-firebase-hooks/firestore';
-import { collection, query, orderBy, addDoc, Timestamp, serverTimestamp, doc, setDoc, getDoc } from 'firebase/firestore';
+import { collection, query, orderBy, addDoc, Timestamp, serverTimestamp, doc, setDoc, getDoc, CollectionReference, Query } from 'firebase/firestore'; // Added CollectionReference, Query
 import type { ChatMessage } from '@/lib/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -41,7 +40,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
     };
 
     const chatDocPath = getChatDocPath();
-    console.log("Chat Doc Path:", chatDocPath); // Log chat path
+    console.log(`[ChatInterface] Chat Doc Path: ${chatDocPath}, Target ID: ${targetId}, Target Type: ${targetType}`); // Log chat path
 
     // Ensure the chat document exists (especially for user-to-user)
     useEffect(() => {
@@ -59,24 +58,34 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
                         lastMessageAt: serverTimestamp(), // Initialize last message timestamp
                         type: 'user' // Mark as user chat
                     });
-                    console.log(`Created chat document: ${chatDocPath}`);
+                    console.log(`[ChatInterface] Created chat document: ${chatDocPath}`);
                 }
             } catch (error) {
-                console.error("Error ensuring chat document exists:", error);
+                console.error("[ChatInterface] Error ensuring chat document exists:", error);
             }
         };
         ensureChatDoc();
     }, [db, chatDocPath, targetType, user?.uid, targetId, user]);
 
 
-    const messagesQuery = db && chatDocPath ? query(collection(db, chatDocPath, 'messages'), orderBy('createdAt', 'asc')) : null;
-    const [messages, loading, error] = useCollectionData<ChatMessage>(messagesQuery, { idField: 'id' });
+     // Query for messages - Use three-argument form of collection()
+     const messagesQuery = db && chatDocPath ? query(collection(db, chatDocPath, 'messages'), orderBy('createdAt', 'asc')) : null;
+     console.log(`[ChatInterface] Messages Query constructed:`, messagesQuery ? 'Yes' : 'No');
+
+
+    const [messages, loading, error] = useCollectionData<ChatMessage>(messagesQuery as Query<ChatMessage> | null, { // Explicit type assertion
+        snapshotListenOptions: { includeMetadataChanges: true },
+        idField: 'id'
+    });
+
 
     // Debugging logs for messages
     useEffect(() => {
-        console.log("Messages Loading:", loading);
-        console.log("Messages Error:", error);
-        console.log("Fetched Messages:", messages);
+        console.log(`[ChatInterface] Messages Loading: ${loading}`);
+        if (error) {
+            console.error("[ChatInterface] Messages Error:", error);
+        }
+        console.log("[ChatInterface] Fetched Messages:", messages); // This should show the actual message data if fetching works
     }, [messages, loading, error]);
 
 
@@ -100,7 +109,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
         };
 
         try {
-            const messagesCollectionRef = collection(db, chatDocPath, 'messages');
+            const messagesCollectionRef = collection(db, chatDocPath, 'messages'); // Correct path for subcollection
             await addDoc(messagesCollectionRef, messageData);
 
             // Update last message timestamp on the parent chat document
@@ -110,7 +119,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
 
             setNewMessage('');
         } catch (err) {
-            console.error("Error sending message:", err);
+            console.error("[ChatInterface] Error sending message:", err);
             toast({ title: "Error", description: "Failed to send message.", variant: "destructive" });
         } finally {
             setIsSending(false);
@@ -149,7 +158,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
                 {messages?.map((msg) => {
                     // Ensure msg and msg.id are valid before rendering
                     if (!msg || !msg.id) {
-                        console.warn("ChatMessage missing or has no id:", msg);
+                        console.warn("[ChatInterface] ChatMessage missing or has no id:", msg);
                         return null; // Skip rendering this message if id is missing
                     }
                     const isSender = msg.senderId === user?.uid;
@@ -201,4 +210,3 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
 };
 
 export default ChatInterface;
-
