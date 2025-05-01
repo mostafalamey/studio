@@ -151,7 +151,7 @@ const TeamsManager: React.FC<{ users: AppUser[], teams: Team[] | undefined, team
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {teams?.map(team => (
-                    <Card key={team.id} className="hover:shadow-md transition-shadow cursor-pointer bg-secondary" onClick={() => onSelectTeam(team)}> {/* Added bg-secondary */}
+                    <Card key={team.id} className="hover:shadow-md transition-shadow cursor-pointer bg-border" onClick={() => onSelectTeam(team)}> {/* Changed to bg-border */}
                         <CardHeader>
                             <div className="flex justify-between items-start">
                                 <CardTitle className="truncate">{team.name}</CardTitle> {/* Added truncate */}
@@ -355,7 +355,7 @@ const TeamMembersList: React.FC<{ team: Team, users: AppUser[], onSelectUser: (u
              <h2 className="text-2xl font-semibold">{team.name} Members</h2>
 
              {/* Card to initiate team chat */}
-             <Card className="hover:shadow-md transition-shadow cursor-pointer bg-secondary" onClick={() => onSelectTeamChat(team)}> {/* Added bg-secondary */}
+             <Card className="hover:shadow-md transition-shadow cursor-pointer bg-border" onClick={() => onSelectTeamChat(team)}> {/* Changed to bg-border */}
                  <CardHeader>
                      <CardTitle className="flex items-center justify-between text-base"> {/* Adjusted text size */}
                          Chat with "{team.name}" Team
@@ -370,7 +370,7 @@ const TeamMembersList: React.FC<{ team: Team, users: AppUser[], onSelectUser: (u
                 isChatActive ? "flex flex-col" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
             )}>
                 {teamMembers.map(member => (
-                    <Card key={member.uid} className="hover:shadow-md transition-shadow cursor-pointer bg-secondary" onClick={() => onSelectUser(member)}> {/* Added bg-secondary */}
+                    <Card key={member.uid} className="hover:shadow-md transition-shadow cursor-pointer bg-border" onClick={() => onSelectUser(member)}> {/* Changed to bg-border */}
                         <CardHeader>
                             <CardTitle className="flex items-center justify-between text-base truncate"> {/* Added truncate */}
                                 {member.displayName || member.email}
@@ -422,7 +422,7 @@ const EmployeeTeamView: React.FC<{ currentUser: AppUser, users: AppUser[], teams
                  isChatActive ? "flex flex-col" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
              )}>
                 {teammates.map(member => (
-                    <Card key={member.uid} className="hover:shadow-md transition-shadow cursor-pointer bg-secondary" onClick={() => onSelectUser(member)}> {/* Added bg-secondary */}
+                    <Card key={member.uid} className="hover:shadow-md transition-shadow cursor-pointer bg-border" onClick={() => onSelectUser(member)}> {/* Changed to bg-border */}
                         <CardHeader>
                             <CardTitle className="flex items-center justify-between text-base truncate"> {/* Added truncate */}
                                 {member.displayName || member.email}
