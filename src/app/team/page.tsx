@@ -297,7 +297,7 @@ const TeamsManager: React.FC<{
 };
 
 // Renamed component: Manages users (add, delete, roles) - Owner only
-const UsersManager: React.FC<{ users: AppUser[], usersLoading: boolean, usersError: Error | undefined }> = ({ users, usersLoading, usersError }) => {
+const UsersManager: React.FC<{ users: AppUser[], usersLoading: boolean, usersError: Error | undefined, userRole: UserRole | null }> = ({ users, usersLoading, usersError, userRole }) => {
     const { db, auth, user: currentUser } = useFirebase(); // Get current user and auth
     const { toast } = useToast();
     const [isSavingRole, setIsSavingRole] = useState<string | null>(null);
@@ -414,6 +414,11 @@ const UsersManager: React.FC<{ users: AppUser[], usersLoading: boolean, usersErr
         }
         setUserToDelete(user);
         setIsReauthPromptOpen(false); // Reset reauth prompt state
+        // Open the initial delete confirmation modal directly
+        // The handleReauthenticateAndDelete flow starts from the "Continue" button there
+        // Set the state to control the initial delete confirmation modal
+        // We don't need a separate state like 'isDeleteConfirmationOpen'
+        // The presence of 'userToDelete' and 'isReauthPromptOpen' manages the modal flow
     };
 
     const closeDeleteUserConfirmation = () => {
@@ -434,83 +439,89 @@ const UsersManager: React.FC<{ users: AppUser[], usersLoading: boolean, usersErr
     const handleDeleteUser = async () => {
         if (!db || !auth?.currentUser || !userToDelete || isDeletingUser) return;
 
+        console.log("Attempting to delete user:", userToDelete.uid); // Log start of deletion
         setIsDeletingUser(true);
 
         try {
              // --- Using Cloud Function for Deletion is Recommended ---
-             // Deleting Auth users requires elevated privileges or re-authentication.
-             // A Cloud Function triggered by the owner is the most secure and reliable way.
-
-             // Step 1: Delete Firestore User Document (Safe client-side for owner)
-             await deleteDoc(doc(db, 'users', userToDelete.uid));
-             console.log(`Firestore document for user ${userToDelete.uid} deleted.`);
-
-             // Step 2: Delete Firebase Auth user (Requires recent login / re-auth / Cloud Function)
-             // IMPORTANT: Directly deleting another user's Auth account from the client-side
-             // is generally not possible or recommended due to security restrictions.
-             // The most robust solution is to use a Firebase Cloud Function triggered by the owner.
-             // This function would have the necessary admin privileges to delete the Auth user.
-
-             // --- Placeholder for Cloud Function Call (Ideal Solution) ---
+             // For robust user deletion (including Auth), use a Cloud Function.
              console.log(`SIMULATING backend deletion for Auth user ${userToDelete.uid}. Implement a Cloud Function for robust deletion.`);
-             // Example (requires setting up Firebase Functions):
-             // try {
-             //    const deleteUserFunction = httpsCallable(functions, 'deleteUser'); // Assuming 'functions' is initialized Firebase Functions instance
-             //    await deleteUserFunction({ userId: userToDelete.uid });
-             //    console.log(`Firebase Auth user ${userToDelete.uid} deletion triggered via Cloud Function.`);
-             //    toast({ title: "User Deletion Initiated", description: `Deletion process for ${userToDelete.email} started.` });
-             // } catch (funcError) {
-             //     console.error("Error calling deleteUser Cloud Function:", funcError);
-             //     // Rollback Firestore delete? Or inform user?
-             //     toast({ title: "Auth Deletion Failed", description: `Could not delete Auth user: ${funcError.message}. User data removed from database.`, variant: "destructive", duration: 10000 });
-             // }
+             // Trigger your Cloud Function here if implemented.
 
+             // --- Client-Side Steps (assuming no Cloud Function yet) ---
 
-             // --- What happens if re-authentication succeeded just before this? ---
-             // Even after re-authenticating the *owner*, the `deleteUser` function in `firebase/auth`
-             // typically requires the user being deleted *to be the currently signed-in user*.
-             // Therefore, calling `deleteAuthUser(someOtherUser)` directly on the client is unlikely to work.
-             // The re-authentication primarily proves the *owner's* identity to allow sensitive actions
-             // like triggering the Cloud Function.
+             // Step 1: Delete Firestore User Document
+             await deleteDoc(doc(db, 'users', userToDelete.uid));
+             console.log(`Firestore document for user ${userToDelete.uid} deleted successfully.`);
 
+             // Step 2: Client-side Auth Deletion (Requires Recent Re-authentication)
+             // This might fail if re-authentication wasn't recent enough, hence the Cloud Function recommendation.
+             // It relies on the re-authentication performed in handleReauthenticateAndDelete.
+             // If you have a Cloud Function, comment out or remove this block.
+             /*
+             if (auth.currentUser) { // Ensure current user is still valid
+                 // The firebase/auth `deleteUser` requires admin privileges or the user themselves.
+                 // Since re-authentication just happened for the *owner*, it MIGHT allow deleting others IF configured server-side.
+                 // However, the standard client SDK `deleteUser(user)` doesn't exist. You delete the *currently* signed-in user.
+                 // A Cloud Function is the correct approach here.
+                 console.warn("Client-side Auth deletion is unreliable. Use a Cloud Function.");
+                 // Example placeholder if trying to call a non-existent function:
+                 // try {
+                 //     await deleteAuthUser(userToDelete); // This function signature likely doesn't exist in client SDK for deleting *other* users
+                 //     console.log(`Firebase Auth user ${userToDelete.uid} deleted (client-side attempt).`);
+                 // } catch (authError) {
+                 //     console.error(`Client-side Auth deletion failed for ${userToDelete.uid}:`, authError);
+                 //     toast({ title: "Auth Deletion Failed", description: `Could not delete Auth user: ${authError.message}. User data removed from database.`, variant: "destructive", duration: 10000 });
+                 //     // Decide on rollback or proceed
+                 // }
+             }
+             */
 
-             // Simulate successful deletion for now as Cloud Function is not implemented
-              toast({ title: "User Removed", description: `User ${userToDelete.email} removed from database. Auth deletion simulated (implement server-side function).`, duration: 7000 });
-
-
-             closeDeleteUserConfirmation(); // Close both modals
+             toast({ title: "User Removed", description: `User ${userToDelete.email} removed from database. Auth deletion simulated (implement server-side function).`, duration: 7000 });
+             closeDeleteUserConfirmation(); // Close all modals on success
 
         } catch (error: any) {
-            console.error("Error deleting user data (Firestore or simulated Auth):", error);
+            console.error("Error during user deletion process:", error);
             toast({ title: "Deletion Error", description: `Failed to delete user data: ${error.message}.`, variant: "destructive" });
-            // Consider if Firestore delete should be rolled back if Auth delete fails (complex)
+            // Consider more sophisticated error handling/rollback if necessary
         } finally {
             setIsDeletingUser(false);
-            setIsReauthenticating(false); // Reset reauth state
+            setIsReauthenticating(false); // Ensure reauth state is reset
         }
     };
 
     // Handle re-authentication attempt
     const handleReauthenticateAndDelete = async () => {
-        if (!auth?.currentUser || !reauthPassword || !userToDelete) return;
+        if (!auth?.currentUser || !reauthPassword || !userToDelete) {
+            console.log("Re-authentication pre-check failed.");
+            return;
+        }
 
+        console.log("Starting re-authentication for owner:", auth.currentUser.email);
         setIsReauthenticating(true);
         try {
             const credential = EmailAuthProvider.credential(auth.currentUser.email!, reauthPassword);
             // Re-authenticate the *currently logged-in owner*
             await reauthenticateWithCredential(auth.currentUser, credential);
+            console.log("Owner Re-authentication successful.");
 
             // Re-authentication successful, NOW proceed with deletion logic
-            console.log("Owner Re-authentication successful.");
             await handleDeleteUser(); // Call the deletion logic
 
         } catch (error: any) {
             console.error("Re-authentication failed:", error);
             toast({ title: "Authentication Failed", description: "Incorrect password. User deletion cancelled.", variant: "destructive" });
             setIsReauthenticating(false); // Allow retry
+            setReauthPassword(''); // Clear password field for retry
             // Keep the re-auth modal open for retry
+        } finally {
+             // Resetting isReauthenticating is handled within this function or in handleDeleteUser's finally block
+            // No, it should be reset here on success/error to allow UI updates
+            // If deletion is successful, closeDeleteUserConfirmation will handle it. If re-auth fails, we reset here.
+             // Let's reset it here explicitly after the try-catch block completes, unless deletion handles it.
+             // handleDeleteUser resets it in its finally block, so maybe it's okay. Let's be safe.
+             // setIsReauthenticating(false); // Moved to error case and handleDeleteUser finally block
         }
-        // No 'finally' here, handleDeleteUser has its own. Resetting isReauthenticating happens in handleDeleteUser or on error.
     };
 
 
@@ -583,7 +594,7 @@ const UsersManager: React.FC<{ users: AppUser[], usersLoading: boolean, usersErr
                                              className="h-9 w-9 text-destructive hover:bg-destructive/10"
                                              onClick={() => openDeleteUserConfirmation(user)}
                                              // Disable if any delete/save is happening, or specifically for the user being deleted
-                                             disabled={isDeletingUser || isSavingRole === user.uid || userToDelete?.uid === user.uid}
+                                             disabled={isDeletingUser || isSavingRole === user.uid || !!userToDelete} // Disable if any user deletion process is active
                                              title="Delete User"
                                          >
                                              <Trash2 className="w-4 h-4" />
@@ -975,11 +986,11 @@ export default function TeamPage() {
                 selectedChatTarget ? 'w-full md:w-1/3 lg:w-1/4 flex flex-col' : 'w-full'
             )}>
                 {/* Back Button - Conditionally render */}
-                {(selectedTeam || selectedChatTarget) && (
+                 {(selectedTeam || (!selectedTeam && selectedChatTarget)) && ( // Show if viewing a team OR if chatting without a selected team (employee view)
                      <Button variant="ghost" size="sm" onClick={handleBackToDefaultView} className="mb-4 flex items-center flex-shrink-0 self-start"> {/* Align left */}
                         <ArrowLeft className="w-4 h-4 mr-1" /> Back to {userRole === 'employee' ? 'Team View' : 'Teams List'}
                     </Button>
-                )}
+                 )}
 
                 {/* Main Title - Show only when not in a specific team/chat view */}
                 {!selectedTeam && !selectedChatTarget && (
@@ -1019,6 +1030,7 @@ export default function TeamPage() {
                                               users={users}
                                               usersLoading={usersLoading}
                                               usersError={usersError}
+                                              userRole={userRole} // Pass userRole down
                                           />
                                       </div>
                                   )}
