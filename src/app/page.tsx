@@ -17,22 +17,46 @@ export default function Home() {
   const { selectedProjectId, setSelectedProjectId } = useProjectContext();
 
   // Conditionally define the query based on user role
-  let projectsQuery: Query | CollectionReference | null = null;
-  if (db) {
-    const projectsCollection = collection(db, 'projects') as CollectionReference<Project>;
-    if (userRole === 'manager' || userRole === 'owner') {
-      // Managers and Owners see all projects
-      projectsQuery = query(projectsCollection, orderBy('createdAt', 'desc'));
-    } else if (userRole === 'employee' && user) {
-       // Placeholder: Employees might see projects they are assigned tasks in.
-       // This requires a more complex query or data structure modification (e.g., adding user IDs to projects).
-       // For now, let's show all projects for simplicity.
-       projectsQuery = query(projectsCollection, orderBy('createdAt', 'desc'));
-    } else {
-      // No user or role, or invalid role
-      projectsQuery = null; // No query if not logged in or role invalid
-    }
-  }
+   const [projectsQuery, setProjectsQuery] = useState<Query | null>(null);
+
+   useEffect(() => {
+        if (db && user) {
+            const projectsCollection = collection(db, 'projects') as CollectionReference<Project>;
+            let q: Query | null = null;
+             try {
+                if (userRole === 'manager' || userRole === 'owner') {
+                    console.log("Home: Fetching projects for Manager/Owner");
+                    // Managers and Owners see all projects
+                    q = query(projectsCollection, orderBy('createdAt', 'desc'));
+                } else if (userRole === 'employee') {
+                    console.log(`Home: Fetching projects for Employee: ${user.uid}`);
+                    // Employees see projects where they are in the 'assignedUsers' array
+                    // This query requires a composite index: (assignedUsers Asc, createdAt Desc)
+                    q = query(
+                        projectsCollection,
+                        where('assignedUsers', 'array-contains', user.uid),
+                        orderBy('createdAt', 'desc')
+                    );
+                 } else {
+                     console.log(`Home: Fetching projects for unknown/invalid role: ${userRole}`);
+                     // Query for a non-existent document ID to return nothing
+                     q = query(projectsCollection, where('__name__', '==', 'nonexistent'));
+                 }
+             } catch (error) {
+                  console.error("Error constructing projects query in Home:", error);
+                  q = query(projectsCollection, where('__name__', '==', 'nonexistent'));
+                  // Consider showing a toast or error message here
+             }
+             setProjectsQuery(q);
+        } else if (db) {
+            console.log("Home: Fetching projects: No user logged in.");
+            const projectsCollection = collection(db, 'projects') as CollectionReference<Project>;
+            setProjectsQuery(query(projectsCollection, where('__name__', '==', 'nonexistent')));
+        } else {
+             console.log("Home: Fetching projects: DB not available.");
+             setProjectsQuery(null);
+        }
+   }, [db, user, userRole]); // Added toast dependency earlier, check if needed
 
 
   const [projects, projectsLoading, projectsError] = useCollectionData<Project>(projectsQuery as Query<Project>, {
@@ -54,7 +78,7 @@ export default function Home() {
   if (loading || projectsLoading) {
     return (
       <div className="flex flex-col space-y-4 p-4 md:p-6">
-        <Skeleton className="h-8 w-1/4" />
+        {/* Skeleton for the Kanban board or content area */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Skeleton className="h-64 rounded-lg" />
           <Skeleton className="h-64 rounded-lg" />
@@ -77,9 +101,8 @@ export default function Home() {
      // Owner specific view - Placeholder for Phase 3
      return (
         <div className="p-6">
-            <h1 className="text-2xl font-semibold mb-4">Owner Dashboard</h1>
             <p className="text-muted-foreground">Financial summaries will be displayed here in Phase 3.</p>
-            {/* You could still show the project list or a specific owner view */}
+            {/* Show Kanban board or message based on project selection */}
              {selectedProjectId ? (
               <KanbanBoard projectId={selectedProjectId} />
             ) : projects && projects.length > 0 ? (
@@ -96,6 +119,7 @@ export default function Home() {
   // Employee and Manager view
   return (
     <>
+       {/* Show Kanban board or message based on project selection */}
        {selectedProjectId ? (
          <KanbanBoard projectId={selectedProjectId} />
        ) : projects && projects.length > 0 ? (
@@ -108,4 +132,3 @@ export default function Home() {
      </>
   );
 }
-

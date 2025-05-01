@@ -6,8 +6,8 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import KanbanColumn from './kanban-column';
 import { useFirebase } from '@/components/providers/firebase-provider';
-import { useCollectionData } from 'react-firebase-hooks/firestore';
-import { collection, query, where, orderBy, doc, updateDoc, FirestoreError, CollectionReference, Query, Timestamp } from 'firebase/firestore'; // Added Timestamp
+import { useCollectionData, useDocumentData } from 'react-firebase-hooks/firestore'; // Import useDocumentData
+import { collection, query, where, orderBy, doc, updateDoc, FirestoreError, CollectionReference, Query, Timestamp, getDoc } from 'firebase/firestore'; // Added Timestamp, getDoc
 import type { Task, ColumnId, Project, Column } from '@/lib/types'; // Import types
 import { initialColumns } from '@/lib/types'; // Import initial columns
 import TaskDetailModal from './task-detail-modal'; // Import the modal
@@ -29,6 +29,12 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false); // State for add task modal
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+  // Firestore query for project details
+  const projectRef = db && projectId ? doc(db, 'projects', projectId) : null;
+  const [project, projectLoading, projectError] = useDocumentData<Project>(projectRef, {
+     idField: 'id', // Include document ID
+  });
 
   // Firestore query for tasks
   let tasksQuery: Query | CollectionReference | null = null;
@@ -54,7 +60,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
   }
 
 
-  const [tasksData, loading, error] = useCollectionData<Task>(tasksQuery as Query<Task> | null, {
+  const [tasksData, tasksLoading, tasksError] = useCollectionData<Task>(tasksQuery as Query<Task> | null, {
     snapshotListenOptions: { includeMetadataChanges: true },
     idField: 'id',
   });
@@ -137,44 +143,63 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
     closeAddTaskModal();
   };
 
+  // Combine loading states
+  const isLoading = tasksLoading || projectLoading;
 
-  if (loading) {
+  if (isLoading) {
      return (
         // Loading state with skeletons, maintaining the flex layout
-        <div className="flex-1 flex gap-4 p-4 md:p-6 overflow-hidden"> {/* Keep overflow hidden */}
-          {initialColumns.map((column) => (
-             <div key={column.id} className="flex flex-col flex-1 min-w-0 bg-secondary/50 p-3 rounded-lg"> {/* Use min-w-0, keep flex-1 */}
-               {/* Simplified Skeleton Header */}
-               <div className="flex items-center justify-between mb-4">
-                 <Skeleton className="h-5 w-1/3" />
-                 <Skeleton className="h-5 w-8 rounded-full" />
-               </div>
-               <Skeleton className="h-24 w-full mb-2 rounded-lg" />
-               <Skeleton className="h-20 w-full mb-2 rounded-lg" />
-               <Skeleton className="h-28 w-full rounded-lg" />
-             </div>
-          ))}
+        <div className="flex flex-col flex-1 h-full overflow-hidden p-4 md:p-6">
+          {/* Skeleton for Top Bar */}
+          <div className="flex justify-between items-center mb-4 flex-shrink-0">
+            <Skeleton className="h-6 w-48" /> {/* Skeleton for Project Name */}
+            <Skeleton className="h-9 w-28" /> {/* Skeleton for Button */}
+          </div>
+          {/* Skeleton for Columns */}
+          <div className="flex flex-1 gap-4 overflow-y-hidden pb-4">
+            {initialColumns.map((column) => (
+              <div key={column.id} className="flex flex-col flex-1 min-w-0 bg-secondary/50 p-3 rounded-lg">
+                <div className="flex items-center justify-between mb-4">
+                  <Skeleton className="h-5 w-1/3" />
+                  <Skeleton className="h-5 w-8 rounded-full" />
+                </div>
+                <Skeleton className="h-24 w-full mb-2 rounded-lg" />
+                <Skeleton className="h-20 w-full mb-2 rounded-lg" />
+                <Skeleton className="h-28 w-full rounded-lg" />
+              </div>
+            ))}
+          </div>
         </div>
      );
    }
 
-   if (error) {
-     return <div className="text-destructive p-4">Error loading tasks: {error.message}</div>;
+   if (tasksError || projectError) {
+     const error = tasksError || projectError;
+     return <div className="text-destructive p-4">Error loading data: {error?.message}</div>;
    }
+
+   // Determine project name display
+    const projectName = project?.name || (projectId ? "Loading Project..." : "Select a Project");
 
   return (
     <DndProvider backend={HTML5Backend}>
        {/* Container uses flex-1 to fill space, overflow-hidden for horizontal control */}
        <div className="flex flex-col flex-1 h-full overflow-hidden p-4 md:p-6">
-         {/* Top Bar: Add Task Button (aligned right) */}
-         {(userRole === 'manager' || userRole === 'owner') && (
-           <div className="flex justify-end mb-4 flex-shrink-0">
+         {/* Top Bar: Project Name & Add Task Button */}
+         <div className="flex justify-between items-center mb-4 flex-shrink-0">
+           {/* Project Title */}
+           <h1 className="text-xl font-semibold truncate">
+               {projectName}
+               {(tasksError || projectError) && <span className="text-destructive ml-2 text-sm">(Error)</span>}
+           </h1>
+           {/* Add Task Button */}
+           {(userRole === 'manager' || userRole === 'owner') && (
              <Button onClick={openAddTaskModal} className="bg-primary hover:bg-primary/90"> {/* Primary blue button */}
                <PlusCircle className="w-4 h-4 mr-2" />
                New Task
              </Button>
-           </div>
-         )}
+           )}
+         </div>
 
          {/* Kanban Columns Area - Flex container, no explicit horizontal scroll, allow vertical scroll on content */}
           <div className="flex flex-1 gap-4 overflow-y-hidden pb-4"> {/* Use overflow-y-hidden here, columns manage their own scroll */}
