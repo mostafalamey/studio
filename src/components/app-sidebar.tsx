@@ -271,19 +271,23 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
   return (
      <Sidebar side="left" variant="sidebar" collapsible="icon" className="border-r border-sidebar-border">
         {/* Logo Area */}
-       <SidebarHeader className="flex items-center justify-center h-16 border-b border-sidebar-border">
-           {/* Container for logo and text */}
-           <div className="flex items-center gap-2 p-2">
-                {/* Replace SVG with Image component */}
+        <SidebarHeader className="flex items-center justify-center h-24 border-b border-sidebar-border p-4"> {/* Increased height and padding */}
+           {/* Container for logo and text, stacked vertically */}
+           <div className="flex flex-col items-center gap-2"> {/* Use flex-col and items-center */}
+                {/* Logo */}
                  <Image
-                    src="https://lh3.googleusercontent.com/pw/AP1GczN64o4V5_J15b2E8R8-8V_GqXo8Zg7Zg8R8-8V_GqXo8Zg7Zg8R8-8V_GqXo8Zg7Zg8R8-8V_GqXo8Zg7Zg8R8-8V_GqXo8Zg7Z=s40-no" // Placeholder URL - REPLACE with the actual image URL
+                    src="/Logo_S.png"
                     alt="ACS Logo"
-                    width={32} // Adjust width as needed
-                    height={32} // Adjust height as needed
-                    className="group-data-[collapsible=icon]:w-6 group-data-[collapsible=icon]:h-6 flex-shrink-0"
-                    data-ai-hint="ACS logo" // Hint for image search
+                    width={64} // Increased width
+                    height={64} // Increased height
+                    className="group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 flex-shrink-0" // Smaller when collapsed
+                    data-ai-hint="ACS logo"
+                    priority
                 />
-               <span className="font-bold text-primary text-sm group-data-[collapsible=icon]:hidden whitespace-nowrap">ACS ProjectFlow</span>
+               {/* App Name */}
+               <span className="font-bold text-lg text-primary group-data-[collapsible=icon]:hidden whitespace-nowrap"> {/* Increased font size */}
+                 ACS ProjectFlow
+               </span>
            </div>
        </SidebarHeader>
 
