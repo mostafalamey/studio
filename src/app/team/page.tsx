@@ -170,8 +170,8 @@ const TeamsManager: React.FC<{ users: AppUser[], teams: Team[] | undefined, team
                                 <ul className="space-y-1 max-h-20 overflow-y-auto">
                                     {team.members.map(memberId => (
                                         <li key={memberId} className="text-sm text-muted-foreground flex items-center">
-                                            <Users className="w-3 h-3 mr-2 flex-shrink-0" />
-                                            {getUserName(memberId)}
+                                            <Users className="w-4 h-4 mr-2 flex-shrink-0" /> {/* Adjusted icon size */}
+                                            <span className="truncate">{getUserName(memberId)}</span> {/* Added truncate */}
                                         </li>
                                     ))}
                                 </ul>
