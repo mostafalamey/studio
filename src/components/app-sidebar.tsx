@@ -141,20 +141,40 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
    useEffect(() => {
        if (!projectsLoading && projects) {
            console.log("Fetched projects:", projects);
+           if (projects.length === 0 && (userRole === 'manager' || userRole === 'owner')) {
+               console.log("No projects found for manager/owner. Ensure projects exist in the database.");
+           } else if (projects.length === 0 && userRole === 'employee') {
+               console.log("No projects found for employee. Ensure projects exist where this user is in the 'assignedUsers' array.");
+           }
+           // Automatically select first project if none is selected
+           if (selectedProjectId === null && projects.length > 0) {
+               setSelectedProjectId(projects[0].id);
+           }
        }
-   }, [projects, projectsLoading]);
+   }, [projects, projectsLoading, userRole, selectedProjectId, setSelectedProjectId]);
 
 
    // Log Firestore errors specifically
    useEffect(() => {
         if (projectsError) {
             console.error("Firestore Error fetching projects:", projectsError);
+             // Check for specific index error message
+             const isIndexError = projectsError.message.includes('query requires an index');
             toast({
-                title: "Database Error",
-                description: `Failed to load projects: ${projectsError.message}. Ensure necessary Firestore indexes are created.`,
+                title: isIndexError ? "Index Required" : "Database Error",
+                description: isIndexError
+                   ? `A Firestore index is required. Please create it using the link in the browser console.`
+                   : `Failed to load projects: ${projectsError.message}.`,
                 variant: "destructive",
-                 duration: 10000, // Show longer for index errors
+                duration: isIndexError ? 20000 : 10000, // Show longer for index errors
             });
+             if (isIndexError) {
+                 // Log the link to the console for easy access
+                 const match = projectsError.message.match(/(https:\/\/console\.firebase\.google\.com\/.*)/);
+                 if (match && match[1]) {
+                     console.error("Create Firestore Index:", match[1]);
+                 }
+             }
         }
     }, [projectsError, toast]);
 
