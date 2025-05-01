@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -51,7 +50,7 @@ interface AssigneeOption extends Pick<AppUser, 'uid' | 'displayName' | 'email'> 
 
 
 const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task, onTaskUpdate }) => {
-  const { db, user, userRole, functions: fbFunctions } = useFirebase(); // Added functions
+  const { db, user, userRole } = useFirebase(); // Removed functions as it's not used
   const storage = getStorage(); // Initialize storage
   const { toast } = useToast();
   const [editedTask, setEditedTask] = useState<Partial<Task>>({});
@@ -78,7 +77,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
           const options: AssigneeOption[] = usersList.map(u => ({
               uid: u.uid,
               displayName: u.displayName || u.email, // Fallback to email if displayName is missing
-              email: u.email
+              email: u.email ?? '' // Ensure email is string or empty string
           }));
           setAssigneeOptions(options);
         } catch (error) {
@@ -129,13 +128,17 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
   };
 
   const handleDateChange = (date: Date | undefined) => {
-    if (date) {
-      setEditedTask(prev => ({ ...prev, dueDate: Timestamp.fromDate(date) }));
-    } else {
-      // Set dueDate to null if date is cleared
-      setEditedTask(prev => ({ ...prev, dueDate: null }));
-    }
-  };
+     // Use a key known to be in Task, like 'dueDate'
+     const fieldName = 'dueDate';
+     if (date) {
+       // Convert Date object to Firestore Timestamp when setting in editedTask
+       setEditedTask(prev => ({ ...prev, [fieldName]: Timestamp.fromDate(date) }));
+     } else {
+       // Set dueDate to null if date is cleared
+       setEditedTask(prev => ({ ...prev, [fieldName]: null }));
+     }
+   };
+
 
    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0 || !db || !user) return;
@@ -289,6 +292,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                 updateData.assigneeId = newAssigneeId;
                 updateData.assigneeName = selectedAssignee?.displayName ?? '';
             } else {
+               // Ensure dueDate is handled correctly (it's already a Timestamp or null in editedTask)
                (updateData as any)[fieldName] = (editedTask as any)[fieldName];
             }
         }
@@ -381,32 +385,29 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
   };
 
    const currentDueDate = getCurrentValue('dueDate');
-   const displayDueDate = currentDueDate instanceof Timestamp ? currentDueDate.toDate() : null;
+   // Ensure displayDueDate is either a Date object or null
+   const displayDueDate = currentDueDate instanceof Timestamp ? currentDueDate.toDate() : (currentDueDate instanceof Date ? currentDueDate : null);
 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      {/* DialogContent now has DialogTitle directly inside as requested */}
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      {/* Increase max width, allow vertical flex, limit height */}
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col"> {/* Changed max-w from 600px to 2xl */}
+         <DialogHeader>
            {/* Input or Span for Title */}
-           {isEditable('name') ? (
-             <DialogTitle>
-               <Input
-                 name="name"
-                 value={(getCurrentValue('name') as string) || ''}
-                 onChange={handleInputChange}
-                 className="text-lg font-semibold border-none p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0" // Style to look like text
-                 placeholder="Task Name"
-                 disabled={!isEditable('name') || isSaving || isDeleting}
-               />
-             </DialogTitle>
-           ) : (
-             <DialogTitle>
-                {/* <span className="text-lg font-semibold">{task.name}</span> */}
-                {task.name} {/* Render directly for accessibility */}
-             </DialogTitle>
-           )}
+           {/* Conditionally render Input based on editability */}
+            {isEditable('name') ? (
+              <Input
+                name="name"
+                value={(getCurrentValue('name') as string) || ''}
+                onChange={handleInputChange}
+                className="text-lg font-semibold h-auto focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0" // More standard input look
+                placeholder="Task Name"
+                disabled={!isEditable('name') || isSaving || isDeleting}
+              />
+            ) : (
+              <DialogTitle>{task.name}</DialogTitle> // Non-editable display
+            )}
           <DialogDescription>
             Manage task details, comments, and attachments.
           </DialogDescription>
@@ -626,5 +627,3 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
 };
 
 export default TaskDetailModal;
-
-    
