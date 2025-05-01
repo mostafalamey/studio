@@ -656,14 +656,36 @@ const UsersManager: React.FC<{ users: AppUser[], usersLoading: boolean, usersErr
              </AlertDialog>
 
               {/* Delete User Confirmation / Re-authentication Prompt */}
-             <AlertDialog open={!!userToDelete} onOpenChange={closeDeleteUserConfirmation}>
+             <AlertDialog open={!!userToDelete && !isReauthPromptOpen} onOpenChange={closeDeleteUserConfirmation}>
                  <AlertDialogContent>
                      <AlertDialogHeader>
                          <AlertDialogTitle>Delete User "{userToDelete?.displayName || userToDelete?.email}"?</AlertDialogTitle>
                          <AlertDialogDescription>
                             This action is irreversible. It will remove the user's data from the database.
-                            Deleting the authentication record requires a server-side function or recent admin login.
-                            <br/><strong className="text-destructive">You must re-enter your password to confirm deletion.</strong>
+                            <br/><strong className="text-destructive">To proceed, you may need to re-authenticate.</strong>
+                         </AlertDialogDescription>
+                     </AlertDialogHeader>
+                     <AlertDialogFooter>
+                         <AlertDialogCancel onClick={closeDeleteUserConfirmation} disabled={isDeletingUser}>Cancel</AlertDialogCancel>
+                         <AlertDialogAction
+                             onClick={promptForReauthentication} // Prompt for re-auth first
+                             disabled={isDeletingUser}
+                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                         >
+                             Continue
+                         </AlertDialogAction>
+                     </AlertDialogFooter>
+                 </AlertDialogContent>
+             </AlertDialog>
+
+             {/* Re-authentication Modal */}
+              <AlertDialog open={isReauthPromptOpen} onOpenChange={closeDeleteUserConfirmation}>
+                  <AlertDialogContent>
+                     <AlertDialogHeader>
+                         <AlertDialogTitle>Re-authentication Required</AlertDialogTitle>
+                         <AlertDialogDescription>
+                            For security, please enter your password to confirm deleting the user
+                             "{userToDelete?.displayName || userToDelete?.email}".
                          </AlertDialogDescription>
                      </AlertDialogHeader>
                       {/* Re-authentication input */}
@@ -674,7 +696,7 @@ const UsersManager: React.FC<{ users: AppUser[], usersLoading: boolean, usersErr
                              type="password"
                              value={reauthPassword}
                              onChange={(e) => setReauthPassword(e.target.value)}
-                             placeholder="Enter your password to confirm"
+                             placeholder="Enter your password"
                              disabled={isReauthenticating || isDeletingUser}
                          />
                          {isReauthenticating && <p className="text-xs text-muted-foreground">Verifying...</p>}
@@ -682,7 +704,7 @@ const UsersManager: React.FC<{ users: AppUser[], usersLoading: boolean, usersErr
                      <AlertDialogFooter>
                          <AlertDialogCancel onClick={closeDeleteUserConfirmation} disabled={isReauthenticating || isDeletingUser}>Cancel</AlertDialogCancel>
                          <AlertDialogAction
-                             onClick={handleReauthenticateAndDelete} // This function now handles re-auth THEN deletion
+                             onClick={handleReauthenticateAndDelete} // This function handles re-auth THEN deletion
                              disabled={!reauthPassword || isReauthenticating || isDeletingUser}
                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                          >
@@ -977,3 +999,5 @@ export default function TeamPage() {
     );
 }
 
+
+    
