@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { LogOut, FolderKanban, PlusCircle, LayoutDashboard, Users, FileText } from 'lucide-react'; // Added icons
 import { useFirebase } from '@/components/providers/firebase-provider';
 import { useCollectionData } from 'react-firebase-hooks/firestore';
-import { collection, query, orderBy, where, addDoc, Timestamp, FirestoreError, CollectionReference, Query } from 'firebase/firestore';
+import { collection, query, orderBy, where, addDoc, Timestamp, FirestoreError, CollectionReference, Query, FieldPath } from 'firebase/firestore'; // Added FieldPath
 import type { Project, UserRole } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -52,36 +52,69 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
   const { selectedProjectId, setSelectedProjectId } = useProjectContext();
 
    // --- Project Fetching Logic ---
-   let projectsQuery: Query | CollectionReference | null = null;
-   if (db && user) {
-     const projectsCollection = collection(db, 'projects') as CollectionReference<Project>;
-     if (userRole === 'manager' || userRole === 'owner') {
-       // Managers and Owners see all projects
-       projectsQuery = query(projectsCollection, orderBy('createdAt', 'desc'));
-     } else if (userRole === 'employee') {
-       // Employees see projects where they are in the 'assignedUsers' array
-       projectsQuery = query(
-         projectsCollection,
-         where('assignedUsers', 'array-contains', user.uid),
-         orderBy('createdAt', 'desc')
-       );
-     } else {
-       // Handle cases where user role might not be set yet or is invalid
-       projectsQuery = query(projectsCollection, where('__name__', '==', 'nonexistent'));
-     }
-   } else if (db) {
-       // If db exists but user doesn't (e.g., logged out), show no projects
-       const projectsCollection = collection(db, 'projects') as CollectionReference<Project>;
-       projectsQuery = query(projectsCollection, where('__name__', '==', 'nonexistent'));
-   } else {
-       // If db doesn't exist (initial load?), set query to null
-       projectsQuery = null;
-   }
+   // Use useState to hold the query, allowing it to be null initially or on error
+   const [projectsQuery, setProjectsQuery] = useState<Query | null>(null);
 
-   const [projects, projectsLoading, projectsError] = useCollectionData<Project>(projectsQuery as Query<Project> | null, {
+   useEffect(() => {
+        if (db && user) {
+            const projectsCollection = collection(db, 'projects') as CollectionReference<Project>;
+            let q: Query | null = null;
+             try {
+                if (userRole === 'manager' || userRole === 'owner') {
+                    // Managers and Owners see all projects
+                    q = query(projectsCollection, orderBy('createdAt', 'desc'));
+                } else if (userRole === 'employee') {
+                    // Employees see projects where they are in the 'assignedUsers' array
+                    q = query(
+                        projectsCollection,
+                        where('assignedUsers', 'array-contains', user.uid),
+                        orderBy('createdAt', 'desc')
+                    );
+                 } else {
+                     // Handle cases where user role might not be set yet or is invalid
+                     // Query for a non-existent document ID to return nothing
+                     q = query(projectsCollection, where('__name__', '==', 'nonexistent'));
+                 }
+             } catch (error) {
+                  console.error("Error constructing projects query:", error);
+                  // Optionally set query to null or a 'nonexistent' query on error
+                  q = query(projectsCollection, where('__name__', '==', 'nonexistent'));
+                  toast({
+                      title: "Query Error",
+                      description: "Could not construct project query.",
+                      variant: "destructive",
+                  });
+             }
+             setProjectsQuery(q);
+        } else if (db) {
+            // If db exists but user doesn't (e.g., logged out), show no projects
+            const projectsCollection = collection(db, 'projects') as CollectionReference<Project>;
+            setProjectsQuery(query(projectsCollection, where('__name__', '==', 'nonexistent')));
+        } else {
+             // If db doesn't exist (initial load?), set query to null
+             setProjectsQuery(null);
+        }
+     // Depend on db, user, and userRole changes
+   }, [db, user, userRole, toast]);
+
+
+   const [projects, projectsLoading, projectsError] = useCollectionData<Project>(projectsQuery, {
      snapshotListenOptions: { includeMetadataChanges: true },
      idField: 'id',
    });
+
+   // Log Firestore errors specifically
+   useEffect(() => {
+        if (projectsError) {
+            console.error("Firestore Error fetching projects:", projectsError);
+            // Detailed toast for Firestore errors
+            toast({
+                title: "Database Error",
+                description: `Failed to load projects: ${projectsError.message} (Code: ${projectsError.code})`,
+                variant: "destructive",
+            });
+        }
+    }, [projectsError, toast]);
 
 
    const handleSelectProject = (projectId: string | null) => {
@@ -205,8 +238,10 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
              <SidebarMenu>
                 {projectsLoading ? (
                     [1, 2].map(i => <SidebarMenuSkeleton key={`skel-proj-${i}`} showIcon />)
-                ) : projectsError ? (
-                    <p key="proj-error" className="text-xs text-destructive px-2">Error loading projects</p>
+                 ) : projectsError ? (
+                     <p key="proj-error" className="text-xs text-destructive px-2">
+                          Error loading projects. Check console for details.
+                     </p>
                  ) : !projects || projects.length === 0 ? (
                      <p key="proj-empty" className="text-xs text-muted-foreground px-2 italic">
                           {userRole === 'manager' || userRole === 'owner' ? 'No projects yet. Add one!' : 'No projects found or assigned.'}
