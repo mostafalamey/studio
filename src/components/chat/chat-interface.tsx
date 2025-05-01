@@ -31,30 +31,33 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
     const getChatDocPath = () => {
         if (!user) return null;
         if (targetType === 'team') {
-            return `chats/${targetId}`;
+            // Team chat path
+            return `chats/team_${targetId}`; // Prefix team chats to avoid collision with user chat IDs
         } else {
-            // User-to-user chat
+            // User-to-user chat path (sorted UIDs)
             const chatId = [user.uid, targetId].sort().join('_');
             return `chats/${chatId}`;
         }
     };
 
     const chatDocPath = getChatDocPath();
+    console.log("Chat Doc Path:", chatDocPath); // Log chat path
 
     // Ensure the chat document exists (especially for user-to-user)
     useEffect(() => {
         const ensureChatDoc = async () => {
-            if (!db || !chatDocPath || targetType !== 'user') return;
+             // Only create for user chats, assume team chats are handled elsewhere or don't need pre-creation
+            if (!db || !chatDocPath || targetType !== 'user' || !user) return;
             const chatDocRef = doc(db, chatDocPath);
             try {
                 const docSnap = await getDoc(chatDocRef);
                 if (!docSnap.exists()) {
                     // Create the chat document if it doesn't exist
                     await setDoc(chatDocRef, {
-                        participants: [user?.uid, targetId].sort(), // Store participants for potential queries
+                        participants: [user.uid, targetId].sort(), // Store participants for potential queries
                         createdAt: serverTimestamp(),
                         lastMessageAt: serverTimestamp(), // Initialize last message timestamp
-                        type: 'user'
+                        type: 'user' // Mark as user chat
                     });
                     console.log(`Created chat document: ${chatDocPath}`);
                 }
@@ -63,16 +66,26 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
             }
         };
         ensureChatDoc();
-    }, [db, chatDocPath, targetType, user?.uid, targetId]);
+    }, [db, chatDocPath, targetType, user?.uid, targetId, user]);
 
 
     const messagesQuery = db && chatDocPath ? query(collection(db, chatDocPath, 'messages'), orderBy('createdAt', 'asc')) : null;
     const [messages, loading, error] = useCollectionData<ChatMessage>(messagesQuery, { idField: 'id' });
 
+    // Debugging logs for messages
     useEffect(() => {
-        // Scroll to bottom when new messages arrive
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages]);
+        console.log("Messages Loading:", loading);
+        console.log("Messages Error:", error);
+        console.log("Fetched Messages:", messages);
+    }, [messages, loading, error]);
+
+
+    useEffect(() => {
+        // Scroll to bottom when new messages arrive or loading finishes
+        if (!loading) {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }
+    }, [messages, loading]);
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -92,7 +105,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
 
             // Update last message timestamp on the parent chat document
              const chatDocRef = doc(db, chatDocPath);
-             await setDoc(chatDocRef, { lastMessageAt: Timestamp.now() }, { merge: true });
+             await setDoc(chatDocRef, { lastMessageAt: Timestamp.now(), type: targetType }, { merge: true }); // Also set type on send
 
 
             setNewMessage('');
@@ -152,7 +165,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
                                 {!isSender && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
                                 <p className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>
                                 <p className={`text-xs mt-1 ${isSender ? 'text-primary-foreground/70' : 'text-muted-foreground/80'} text-right`}>
-                                    {msg.createdAt?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                     {/* Check if createdAt exists and is a Timestamp before formatting */}
+                                     {msg.createdAt && msg.createdAt.toDate ?
+                                       msg.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) :
+                                       'Sending...'} {/* Placeholder if timestamp isn't ready */}
                                 </p>
                             </div>
                              {isSender && (
