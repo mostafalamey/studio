@@ -64,6 +64,16 @@ export interface AppUser {
   // Add other user-specific fields if needed
 }
 
+// Interface for team data stored in Firestore ('teams' collection)
+export interface Team {
+    id: string;
+    name: string;
+    members: string[]; // Array of user IDs (AppUser.uid)
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+    // Add other team-specific fields if needed, e.g., description, team lead ID
+}
+
 
 // Initial columns setup
 export const initialColumns: Column[] = [

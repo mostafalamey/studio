@@ -3,6 +3,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image'; // Import next/image
+import Link from 'next/link'; // Import Link for navigation
+import { usePathname } from 'next/navigation'; // Import usePathname for active state
 import {
   Sidebar,
   SidebarHeader,
@@ -72,6 +74,7 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
   const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const { selectedProjectId, setSelectedProjectId } = useProjectContext();
+  const pathname = usePathname(); // Get current pathname
 
    // --- Project Fetching Logic ---
    const [projectsQuery, setProjectsQuery] = useState<Query | null>(null);
@@ -149,6 +152,9 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
 
    const handleSelectProject = (projectId: string | null) => {
      setSelectedProjectId(projectId);
+     // If using App Router and selecting project changes the main view,
+     // potentially navigate here or let the main component handle the change.
+     // e.g., router.push('/'); // Navigate back to the board view if needed
    };
    // --- End Project Fetching Logic ---
 
@@ -362,15 +368,18 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
                      projects.map((project) => (
                          <SidebarMenuItem key={project.id}> {/* Use project.id as key */}
                             <div className="flex items-center w-full">
-                             <SidebarMenuButton
-                                 onClick={() => handleSelectProject(project.id)}
-                                 isActive={selectedProjectId === project.id} // Use context state for isActive
-                                 tooltip={{ children: project.name }} // Show tooltip when collapsed
-                                 className="justify-start group-data-[collapsible=icon]:justify-center flex-grow" // Use flex-grow
-                             >
-                                 <FolderKanban className="flex-shrink-0" />
-                                 <span className="truncate">{project.name}</span>
-                             </SidebarMenuButton>
+                             {/* Wrap button in Link for navigation */}
+                             <Link href="/" passHref legacyBehavior>
+                               <SidebarMenuButton
+                                   onClick={() => handleSelectProject(project.id)}
+                                   isActive={pathname === '/' && selectedProjectId === project.id} // Active if on home and this project selected
+                                   tooltip={{ children: project.name }} // Show tooltip when collapsed
+                                   className="justify-start group-data-[collapsible=icon]:justify-center flex-grow" // Use flex-grow
+                               >
+                                   <FolderKanban className="flex-shrink-0" />
+                                   <span className="truncate">{project.name}</span>
+                               </SidebarMenuButton>
+                             </Link>
 
                              {/* Three Dots Menu for Delete (Managers/Owners only) */}
                               {(userRole === 'manager' || userRole === 'owner') && (
@@ -411,26 +420,30 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
              <SidebarGroupLabel className="group-data-[collapsible=icon]:px-2">MAIN MENU</SidebarGroupLabel>
              <SidebarMenu>
                  <SidebarMenuItem key="dashboard">
-                      <SidebarMenuButton
-                          isActive={false}
-                          tooltip={{ children: "Dashboard" }}
-                          className="justify-start group-data-[collapsible=icon]:justify-center"
-                          disabled // Disable for now
-                      >
-                          <LayoutDashboard className="flex-shrink-0" />
-                          <span className="truncate">Dashboard</span>
-                      </SidebarMenuButton>
+                      <Link href="/dashboard" passHref legacyBehavior>
+                          <SidebarMenuButton
+                              isActive={pathname === '/dashboard'}
+                              tooltip={{ children: "Dashboard" }}
+                              className="justify-start group-data-[collapsible=icon]:justify-center"
+                              disabled // Disable for now
+                          >
+                              <LayoutDashboard className="flex-shrink-0" />
+                              <span className="truncate">Dashboard</span>
+                          </SidebarMenuButton>
+                       </Link>
                   </SidebarMenuItem>
                    <SidebarMenuItem key="team">
-                      <SidebarMenuButton
-                          isActive={false}
-                          tooltip={{ children: "Team" }}
-                          className="justify-start group-data-[collapsible=icon]:justify-center"
-                          disabled // Disable for now
-                      >
-                          <Users className="flex-shrink-0" />
-                          <span className="truncate">Team</span>
-                      </SidebarMenuButton>
+                      <Link href="/team" passHref legacyBehavior>
+                          <SidebarMenuButton
+                              isActive={pathname.startsWith('/team')} // Active if path starts with /team
+                              tooltip={{ children: "Team" }}
+                              className="justify-start group-data-[collapsible=icon]:justify-center"
+                              // disabled // Enable the team link
+                          >
+                              <Users className="flex-shrink-0" />
+                              <span className="truncate">Team</span>
+                          </SidebarMenuButton>
+                      </Link>
                   </SidebarMenuItem>
              </SidebarMenu>
          </SidebarGroup>
@@ -472,6 +485,3 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
 };
 
 export default AppSidebar;
-
-    
-    
