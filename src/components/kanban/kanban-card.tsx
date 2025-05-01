@@ -76,8 +76,15 @@ const KanbanCard: React.FC<KanbanCardProps> = ({ task, onClick }) => {
             "mb-2 shadow-sm hover:shadow-md transition-shadow duration-200 rounded-lg bg-card border-l-4",
             priorityBorderStyles[task.priority] // Apply dynamic border color
         )}>
-        <CardHeader className="p-3 pb-1 flex flex-row justify-end items-start"> {/* Removed justify-between, only avatar remains */}
-            {/* Assignee Avatar (moved to header) */}
+        <CardHeader className="p-3 pb-1 flex flex-row justify-between items-start"> {/* Use justify-between */}
+            {/* Priority Badge (Moved here) */}
+            <Badge variant="secondary" className={cn(
+              "text-xs font-medium px-1.5 py-0.5 rounded capitalize self-start", // Add self-start
+              priorityBadgeStyles[task.priority]
+            )}>
+              {task.priority}
+            </Badge>
+            {/* Assignee Avatar */}
            <Avatar className="h-6 w-6" title={`Assigned to: ${task.assigneeName || 'Unassigned'}`}>
              {/* Add AvatarImage if you store profile picture URLs */}
              {/* <AvatarImage src={task.assigneeAvatarUrl} alt={task.assigneeName} /> */}
@@ -92,13 +99,6 @@ const KanbanCard: React.FC<KanbanCardProps> = ({ task, onClick }) => {
         <CardContent className="p-3 pt-0 pb-2 space-y-1">
           {/* Task Name */}
            <p className="text-sm font-medium leading-snug text-card-foreground break-words">{task.name}</p>
-            {/* Priority Badge */}
-            <Badge variant="secondary" className={cn(
-              "text-xs font-medium px-1.5 py-0.5 rounded capitalize",
-              priorityBadgeStyles[task.priority]
-            )}>
-              {task.priority}
-            </Badge>
           {/* Date */}
            <div className="flex items-center space-x-1 text-xs text-muted-foreground pt-1">
               <CalendarDays className="w-3 h-3" />
