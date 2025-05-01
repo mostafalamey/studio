@@ -39,13 +39,16 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ column, tasks, onDropTask, 
       ref={drop}
       className={cn(
         "flex flex-col h-full flex-1 rounded-lg min-w-0", // Use flex-1 for responsive width, remove fixed min-width, add min-w-0
-        isOver && canDrop ? 'bg-accent/60' : 'bg-secondary/50' // Lighter bg, slight accent on hover
+        isOver && canDrop ? 'bg-accent/60' : 'bg-border' // Darker bg (bg-border), slight accent on hover
       )}
       // Remove explicit style flexBasis
     >
       {/* Removed outer Card component, using div for bg color */}
       <div className="flex flex-col flex-grow p-3 overflow-hidden"> {/* Add overflow-hidden to parent */}
-        <div className="flex items-center justify-between mb-4 sticky top-0 bg-secondary/50 pt-1 pb-2 z-10 -mx-3 px-3 flex-shrink-0"> {/* Sticky header with padding, prevent shrinking */}
+        <div className={cn(
+            "flex items-center justify-between mb-4 sticky top-0 pt-1 pb-2 z-10 -mx-3 px-3 flex-shrink-0",
+             isOver && canDrop ? 'bg-accent/60' : 'bg-border' // Match background color
+            )}> {/* Sticky header with padding, prevent shrinking */}
           <h3 className="text-sm font-semibold text-foreground truncate">{column.title}</h3> {/* Allow truncation */}
           <Badge variant="secondary" className="text-xs font-semibold rounded-full px-2 py-0.5 flex-shrink-0"> {/* Prevent shrinking */}
             {tasks.length}
