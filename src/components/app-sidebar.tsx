@@ -84,31 +84,27 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
   const pathname = usePathname(); // Get current pathname
   const { theme, setTheme } = useTheme();
   const [isMounted, setIsMounted] = useState(false); // To prevent hydration mismatch for theme
+  const [filteredProjects, setFilteredProjects] = useState<Project[]>([]); // Filtered projects for employees
 
    // --- Project Fetching Logic ---
    const [projectsQuery, setProjectsQuery] = useState<Query | null>(null);
 
+   // Fetch projects based on role
    useEffect(() => {
         if (db && user) {
             const projectsCollection = collection(db, 'projects') as CollectionReference<Project>;
             let q: Query | null = null;
              try {
                 if (userRole === 'manager' || userRole === 'owner') {
-                    console.log("Fetching projects for Manager/Owner");
-                    // Managers and Owners see all projects
+                    // Managers/Owners see all projects initially
                     q = query(projectsCollection, orderBy('createdAt', 'desc'));
                 } else if (userRole === 'employee') {
-                    console.log(`Fetching projects for Employee: ${user.uid}`);
-                    // Employees see projects where they are in the 'assignedUsers' array
-                    // This query requires a composite index: (assignedUsers Asc, createdAt Desc)
-                    q = query(
-                        projectsCollection,
-                        where('assignedUsers', 'array-contains', user.uid),
-                        orderBy('createdAt', 'desc')
-                    );
+                     // Employees: Fetch all projects for now, filtering happens later based on tasks
+                     // Alternative: Could query projects where assignedUsers might contain the ID,
+                     // but filtering based on *actual* assigned tasks is more accurate.
+                     q = query(projectsCollection, orderBy('createdAt', 'desc'));
                  } else {
-                     console.log(`Fetching projects for unknown/invalid role: ${userRole}`);
-                     // Query for a non-existent document ID to return nothing
+                     // Unknown role or no user role defined
                      q = query(projectsCollection, where('__name__', '==', 'nonexistent'));
                  }
              } catch (error) {
@@ -122,11 +118,11 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
              }
              setProjectsQuery(q);
         } else if (db) {
-            console.log("Fetching projects: No user logged in.");
+            // No user logged in
             const projectsCollection = collection(db, 'projects') as CollectionReference<Project>;
             setProjectsQuery(query(projectsCollection, where('__name__', '==', 'nonexistent')));
         } else {
-             console.log("Fetching projects: DB not available.");
+             // DB not available
              setProjectsQuery(null);
         }
    }, [db, user, userRole, toast]);
@@ -137,46 +133,100 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
      idField: 'id',
    });
 
-   // Log fetched projects for debugging
-   useEffect(() => {
-       if (!projectsLoading && projects) {
-           console.log("Fetched projects:", projects);
-           if (projects.length === 0 && (userRole === 'manager' || userRole === 'owner')) {
-               console.log("No projects found for manager/owner. Ensure projects exist in the database.");
-           } else if (projects.length === 0 && userRole === 'employee') {
-               console.log("No projects found for employee. Ensure projects exist where this user is in the 'assignedUsers' array.");
-           }
-           // Automatically select first project if none is selected
-           if (selectedProjectId === null && projects.length > 0) {
-               setSelectedProjectId(projects[0].id);
-           }
-       }
-   }, [projects, projectsLoading, userRole, selectedProjectId, setSelectedProjectId]);
+    // Fetch all tasks assigned to the current employee (only if role is employee)
+    const employeeTasksQuery = db && user && userRole === 'employee'
+        ? query(collection(db, 'tasks') as CollectionReference<Task>, where('assigneeId', '==', user.uid))
+        : null;
+
+    const [employeeTasks, employeeTasksLoading, employeeTasksError] = useCollectionData<Task>(employeeTasksQuery, {
+        snapshotListenOptions: { includeMetadataChanges: true },
+        idField: 'id',
+    });
+
+    // Filter projects for employees based on assigned tasks
+    useEffect(() => {
+        if (userRole === 'employee') {
+            if (!projectsLoading && projects && !employeeTasksLoading && employeeTasks) {
+                const assignedProjectIds = new Set(employeeTasks.map(task => task.projectId));
+                const finalProjects = projects.filter(project => assignedProjectIds.has(project.id));
+                setFilteredProjects(finalProjects);
+
+                // Auto-select logic based on filtered projects
+                if (selectedProjectId === null && finalProjects.length > 0) {
+                    setSelectedProjectId(finalProjects[0].id);
+                } else if (selectedProjectId && !finalProjects.some(p => p.id === selectedProjectId)) {
+                    setSelectedProjectId(finalProjects.length > 0 ? finalProjects[0].id : null);
+                } else if (finalProjects.length === 0 && selectedProjectId !== null) {
+                    // If no projects left for employee, deselect
+                    setSelectedProjectId(null);
+                }
+
+            } else if (!projectsLoading && !employeeTasksLoading) {
+                 // Handle cases where projects or tasks are loaded but empty
+                 setFilteredProjects([]);
+                 if (selectedProjectId !== null) {
+                      setSelectedProjectId(null); // Deselect if no projects match
+                 }
+            } else {
+                setFilteredProjects([]); // Default to empty while loading
+            }
+        } else if (userRole === 'manager' || userRole === 'owner') {
+             // Managers/Owners see all fetched projects
+            if (!projectsLoading && projects) {
+                setFilteredProjects(projects);
+                 // Auto-select for manager/owner
+                 if (selectedProjectId === null && projects.length > 0) {
+                     setSelectedProjectId(projects[0].id);
+                 } else if (selectedProjectId && !projects.some(p => p.id === selectedProjectId)) {
+                     // If currently selected project doesn't exist anymore (e.g., deleted)
+                      setSelectedProjectId(projects.length > 0 ? projects[0].id : null);
+                 } else if (projects.length === 0 && selectedProjectId !== null) {
+                     setSelectedProjectId(null);
+                 }
+            } else {
+                 setFilteredProjects([]);
+            }
+        } else {
+             // No role or other cases
+             setFilteredProjects([]);
+             if (selectedProjectId !== null) {
+                 setSelectedProjectId(null);
+             }
+        }
+    }, [
+        userRole,
+        projects, projectsLoading,
+        employeeTasks, employeeTasksLoading,
+        selectedProjectId, setSelectedProjectId
+    ]);
+
+   // Combined loading state
+   const combinedLoading = authLoading || projectsLoading || (userRole === 'employee' && employeeTasksLoading);
+   const combinedError = projectsError || (userRole === 'employee' && employeeTasksError);
 
 
    // Log Firestore errors specifically
    useEffect(() => {
-        if (projectsError) {
-            console.error("Firestore Error fetching projects:", projectsError);
-             // Check for specific index error message
-             const isIndexError = projectsError.message.includes('query requires an index');
+        const error = projectsError || employeeTasksError;
+        if (error) {
+            console.error("Firestore Error (Sidebar):", error);
+             const isIndexError = error.message.includes('query requires an index');
             toast({
                 title: isIndexError ? "Index Required" : "Database Error",
                 description: isIndexError
                    ? `A Firestore index is required. Please create it using the link in the browser console.`
-                   : `Failed to load projects: ${projectsError.message}.`,
+                   : `Failed to load data: ${error.message}.`,
                 variant: "destructive",
                 duration: isIndexError ? 20000 : 10000, // Show longer for index errors
             });
              if (isIndexError) {
-                 // Log the link to the console for easy access
-                 const match = projectsError.message.match(/(https:\/\/console\.firebase\.google\.com\/.*)/);
+                 const match = error.message.match(/(https:\/\/console\.firebase\.google\.com\/.*)/);
                  if (match && match[1]) {
                      console.error("Create Firestore Index:", match[1]);
                  }
              }
         }
-    }, [projectsError, toast]);
+    }, [projectsError, employeeTasksError, toast]);
 
    // Prevent hydration mismatch for theme switcher
    useEffect(() => {
@@ -186,9 +236,6 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
 
    const handleSelectProject = (projectId: string | null) => {
      setSelectedProjectId(projectId);
-     // If using App Router and selecting project changes the main view,
-     // potentially navigate here or let the main component handle the change.
-     // e.g., router.push('/'); // Navigate back to the board view if needed
    };
    // --- End Project Fetching Logic ---
 
@@ -455,19 +502,19 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
              )}
 
              <SidebarMenu>
-                {projectsLoading ? (
+                {combinedLoading ? (
                     [1, 2].map(i => <SidebarMenuSkeleton key={`skel-proj-${i}`} showIcon />)
-                 ) : projectsError ? (
+                 ) : combinedError ? (
                      <p key="proj-error" className="text-xs text-destructive px-2">
                           Error loading projects. Check console & indexes.
                      </p>
-                 ) : !projects || projects.length === 0 ? (
+                 ) : !filteredProjects || filteredProjects.length === 0 ? (
                      <p key="proj-empty" className="text-xs text-muted-foreground px-2 italic">
                           {userRole === 'manager' || userRole === 'owner' ? 'No projects yet. Add one!' : 'No projects assigned.'}
                      </p>
                  ) : (
-                     // Project list
-                     projects.map((project) => (
+                     // Use filteredProjects for rendering
+                     filteredProjects.map((project) => (
                          <SidebarMenuItem key={project.id}> {/* Use project.id as key */}
                             <div className="flex items-center w-full">
                              {/* Wrap button in Link for navigation */}
