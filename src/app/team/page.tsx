@@ -562,7 +562,7 @@ const UsersManager: React.FC<{ users: AppUser[], usersLoading: boolean, usersErr
                     {users.map(user => {
                          const isCurrentUser = currentUser?.uid === user.uid;
                          return (
-                            <div key={user.uid} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 border rounded-lg gap-4">
+                            <div key={user.uid} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 border rounded-lg gap-4 bg-border">
                                 {/* User Info */}
                                 <div className="flex-grow">
                                     <p className="font-medium">{user.displayName || user.email}</p>
