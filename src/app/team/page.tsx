@@ -350,14 +350,12 @@ const TeamMembersList: React.FC<{ team: Team, users: AppUser[], onSelectUser: (u
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center gap-2 mb-4"> {/* Added margin bottom */}
-                 <Button variant="ghost" size="sm" onClick={onBack} className="flex items-center">
-                    <ArrowLeft className="w-4 h-4 mr-1"/> Back to Teams
-                 </Button>
-            </div>
+             {/* <Button variant="ghost" size="sm" onClick={onBack} className="mb-4 flex items-center">
+                <ArrowLeft className="w-4 h-4 mr-1"/> Back to Teams
+             </Button> */}
              <h2 className="text-2xl font-semibold">{team.name} Members</h2>
 
-             {/* Card to initiate team chat - Keep this even when chat is active? */}
+             {/* Card to initiate team chat */}
              <Card className="hover:shadow-md transition-shadow cursor-pointer bg-secondary" onClick={() => onSelectTeamChat(team)}>
                  <CardHeader>
                      <CardTitle className="flex items-center justify-between text-base"> {/* Adjusted text size */}
@@ -517,8 +515,10 @@ export default function TeamPage() {
             {/* Left Panel: Navigation/List View */}
             {/* Conditionally hide this panel on mobile when chat is active */}
             <div className={`
-                ${selectedChatTarget ? 'hidden md:block md:w-1/3 lg:w-1/4' : 'w-full'}
+                ${selectedChatTarget ? 'w-1/3 lg:w-1/4' : 'w-full'}
                  p-4 md:p-6 space-y-8 overflow-y-auto border-r
+                 transition-all duration-300 ease-in-out
+                 ${selectedChatTarget && 'hidden md:block'} {/* Hide on mobile when chat active */}
             `}>
                 {/* Back button to go to default view if a team or chat is selected */}
                 {(selectedTeam || selectedChatTarget) && (
@@ -563,7 +563,7 @@ export default function TeamPage() {
                                      </div>
                                  )}
                             </>
-                         ) : selectedTeam ? ( // Team selected: Show TeamMembersList
+                         ) : selectedTeam && !selectedChatTarget ? ( // Team selected, no chat active: Show TeamMembersList
                              <TeamMembersList
                                 team={selectedTeam}
                                 users={users}
@@ -571,7 +571,16 @@ export default function TeamPage() {
                                 onSelectTeamChat={handleSelectTeamChat} // Allows starting team chat
                                 onBack={handleBackToDefaultView} // Back to team list
                              />
-                         ) : null } {/* If only chat is selected but no team, left panel might be blank or show something else */}
+                         ) : selectedTeam && selectedChatTarget ? ( // Team selected AND chat active
+                            // Show TeamMembersList in the left pane on larger screens
+                            <TeamMembersList
+                                team={selectedTeam}
+                                users={users}
+                                onSelectUser={handleSelectUser}
+                                onSelectTeamChat={handleSelectTeamChat}
+                                onBack={handleBackToDefaultView}
+                             />
+                         ): null } {/* If only chat is selected but no team, left panel might be blank or show something else */}
                      </>
                  )}
             </div>
@@ -590,4 +599,5 @@ export default function TeamPage() {
         </div>
     );
 }
-        
+
+    
