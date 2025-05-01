@@ -19,10 +19,10 @@ import {
   SidebarMenuSkeleton,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { LogOut, FolderKanban, PlusCircle, LayoutDashboard, Users, FileText, MoreHorizontal, Trash2, Sun, Moon } from 'lucide-react'; // Added Sun, Moon
+import { LogOut, FolderKanban, PlusCircle, LayoutDashboard, Users, FileText, MoreHorizontal, Trash2, Sun, Moon, Edit } from 'lucide-react'; // Added Sun, Moon, Edit
 import { useFirebase } from '@/components/providers/firebase-provider';
 import { useCollectionData } from 'react-firebase-hooks/firestore';
-import { collection, query, orderBy, where, addDoc, Timestamp, FirestoreError, CollectionReference, Query, FieldPath, doc, setDoc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore'; // Added deleteDoc, getDocs, writeBatch
+import { collection, query, orderBy, where, addDoc, Timestamp, FirestoreError, CollectionReference, Query, FieldPath, doc, setDoc, deleteDoc, getDocs, writeBatch, updateDoc } from 'firebase/firestore'; // Added deleteDoc, getDocs, writeBatch, updateDoc
 import { getStorage, ref, deleteObject, listAll } from 'firebase/storage'; // Import storage functions
 import type { Project, UserRole, Task } from '@/lib/types'; // Added Task type
 import { useToast } from '@/hooks/use-toast';
@@ -34,6 +34,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogTrigger,
+  DialogClose, // Import DialogClose
 } from "@/components/ui/dialog";
 import {
     DropdownMenu,
@@ -74,6 +75,11 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
   const [isDeletingProject, setIsDeletingProject] = useState(false); // State for delete operation
   const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [isEditingProject, setIsEditingProject] = useState(false); // State for edit operation
+  const [isEditProjectModalOpen, setIsEditProjectModalOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [editedProjectName, setEditedProjectName] = useState('');
+  const [editedProjectDescription, setEditedProjectDescription] = useState('');
   const { selectedProjectId, setSelectedProjectId } = useProjectContext();
   const pathname = usePathname(); // Get current pathname
   const { theme, setTheme } = useTheme();
@@ -126,7 +132,7 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
    }, [db, user, userRole, toast]);
 
 
-   const [projects, projectsLoading, projectsError] = useCollectionData<Project>(projectsQuery, {
+   const [projects, projectsLoading, projectsError] = useCollectionData<Project>(projectsQuery as Query<Project>, {
      snapshotListenOptions: { includeMetadataChanges: true },
      idField: 'id',
    });
@@ -179,6 +185,7 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
         name: newProjectName.trim(),
         description: newProjectDescription.trim() || '',
         createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(), // Add updatedAt
         createdBy: user.uid,
         assignedUsers: [], // Initialize with empty array
       });
@@ -194,6 +201,36 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
       setIsAddingProject(false);
     }
   };
+
+    const openEditProjectModal = (project: Project) => {
+        setEditingProject(project);
+        setEditedProjectName(project.name);
+        setEditedProjectDescription(project.description || '');
+        setIsEditProjectModalOpen(true);
+    };
+
+    const handleEditProject = async () => {
+        if (!db || !editingProject || !editedProjectName.trim()) return;
+        setIsEditingProject(true);
+
+        try {
+            const projectRef = doc(db, 'projects', editingProject.id);
+            await updateDoc(projectRef, {
+                name: editedProjectName.trim(),
+                description: editedProjectDescription.trim() || '',
+                updatedAt: Timestamp.now(),
+            });
+            toast({ title: "Project Updated", description: `"${editedProjectName}" updated successfully.` });
+            setIsEditProjectModalOpen(false);
+            setEditingProject(null); // Clear editing project state
+        } catch (error) {
+            console.error("Error updating project:", error);
+            toast({ title: "Error", description: "Failed to update project.", variant: "destructive" });
+        } finally {
+            setIsEditingProject(false);
+        }
+    };
+
 
   const openDeleteConfirmation = (project: Project) => {
     setProjectToDelete(project);
@@ -325,7 +362,7 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
            <div className="flex flex-col items-center gap-2"> {/* Use flex-col and items-center */}
                 {/* Logo */}
                  <Image
-                    src="/Logo_S.png"
+                    src="/Logo_S.png" // Path relative to the public directory
                     alt="ACS Logo"
                     width={64} // Increased width
                     height={64} // Increased height
@@ -386,7 +423,9 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
                       </div>
                    </div>
                    <DialogFooter>
-                     <Button variant="outline" onClick={() => setIsAddProjectModalOpen(false)} disabled={isAddingProject}>Cancel</Button>
+                     <DialogClose asChild>
+                        <Button variant="outline" disabled={isAddingProject}>Cancel</Button>
+                     </DialogClose>
                      <Button onClick={handleAddProject} disabled={!newProjectName.trim() || isAddingProject}>
                        {isAddingProject ? 'Creating...' : 'Create Project'}
                      </Button>
@@ -424,7 +463,7 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
                                </SidebarMenuButton>
                              </Link>
 
-                             {/* Three Dots Menu for Delete (Managers/Owners only) */}
+                             {/* Three Dots Menu for Edit/Delete (Managers/Owners only) */}
                               {(userRole === 'manager' || userRole === 'owner') && (
                                  <DropdownMenu>
                                      <DropdownMenuTrigger asChild>
@@ -441,9 +480,17 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
                                      </DropdownMenuTrigger>
                                      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                                          <DropdownMenuItem
+                                             onClick={() => openEditProjectModal(project)}
+                                             disabled={isDeletingProject || isEditingProject}
+                                         >
+                                             <Edit className="mr-2 h-4 w-4" />
+                                             <span>Edit Project</span>
+                                         </DropdownMenuItem>
+                                         <DropdownMenuSeparator />
+                                         <DropdownMenuItem
                                              className="text-destructive focus:bg-destructive/10 focus:text-destructive"
                                              onClick={() => openDeleteConfirmation(project)}
-                                             disabled={isDeletingProject}
+                                             disabled={isDeletingProject || isEditingProject}
                                          >
                                              <Trash2 className="mr-2 h-4 w-4" />
                                              <span>Delete Project</span>
@@ -517,6 +564,48 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
            </Button>
          </div>
       </SidebarFooter>
+
+       {/* Edit Project Modal */}
+        <Dialog open={isEditProjectModalOpen} onOpenChange={setIsEditProjectModalOpen}>
+           <DialogContent>
+             <DialogHeader>
+               <DialogTitle>Edit Project</DialogTitle>
+               <DialogDescription>Modify the name and description of the project.</DialogDescription>
+             </DialogHeader>
+             <div className="grid gap-4 py-4">
+               <div className="grid grid-cols-4 items-center gap-4">
+                 <Label htmlFor="edit-project-name" className="text-right">Name</Label>
+                 <Input
+                   id="edit-project-name"
+                   value={editedProjectName}
+                   onChange={(e) => setEditedProjectName(e.target.value)}
+                   className="col-span-3"
+                   disabled={isEditingProject}
+                 />
+               </div>
+                <div className="grid grid-cols-4 items-start gap-4">
+                  <Label htmlFor="edit-project-description" className="text-right pt-2">Description</Label>
+                  <Textarea
+                    id="edit-project-description"
+                    value={editedProjectDescription}
+                    onChange={(e) => setEditedProjectDescription(e.target.value)}
+                    className="col-span-3 min-h-[80px]"
+                    disabled={isEditingProject}
+                    placeholder="Optional: Add a brief description..."
+                  />
+                </div>
+             </div>
+             <DialogFooter>
+                <DialogClose asChild>
+                    <Button variant="outline" disabled={isEditingProject}>Cancel</Button>
+                </DialogClose>
+               <Button onClick={handleEditProject} disabled={!editedProjectName.trim() || isEditingProject}>
+                 {isEditingProject ? 'Saving...' : 'Save Changes'}
+               </Button>
+             </DialogFooter>
+           </DialogContent>
+        </Dialog>
+
 
         {/* Delete Project Confirmation Dialog */}
          {projectToDelete && (
