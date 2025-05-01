@@ -15,7 +15,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'ACS ProjectFlow', // Updated title
+  title: 'ACS Project Flow', // Updated title
   description: 'Project Management & Accountability Tool for ACS', // Updated description
 };
 
