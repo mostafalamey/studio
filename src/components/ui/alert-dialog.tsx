@@ -105,7 +105,12 @@ const AlertDialogAction = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Action
     ref={ref}
-    className={cn(buttonVariants(), className)} // Apply default button variants
+    // Apply default button variants, allowing override via className
+    // Specifically handle destructive variant if passed via className
+    className={cn(
+        buttonVariants({ variant: props.className?.includes('bg-destructive') ? 'destructive' : 'default' }), // Check className for destructive hint
+        className // Apply overrides
+     )}
     {...props}
   />
 ))
@@ -141,5 +146,4 @@ export {
   AlertDialogAction,
   AlertDialogCancel,
 }
-
-    
+```
