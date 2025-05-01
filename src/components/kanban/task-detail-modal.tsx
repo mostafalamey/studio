@@ -270,31 +270,23 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
         return;
     };
 
-     // Check if there are actual changes to save
-    const changesToSave = Object.keys(editedTask).some(key =>
-        isEditable(key as keyof Task) && editedTask[key as keyof Task] !== task[key as keyof Task]
-    );
-
-     if (!changesToSave) {
-         onClose(); // No changes, just close
-         return;
-     }
-
-
     setIsSaving(true);
     const taskRef = doc(db, 'tasks', task.id);
+    const projectRef = doc(db, 'projects', task.projectId); // Reference to the project
 
-    // Prepare update data, ensuring only allowed fields are included
+    // Detect if assignee changed
+    const originalAssigneeId = task.assigneeId;
+    const newAssigneeId = editedTask.assigneeId ?? null; // Use null for unassigned
+    const assigneeChanged = editedTask.hasOwnProperty('assigneeId') && newAssigneeId !== originalAssigneeId;
+
+    // Prepare update data for the task
     const updateData: Partial<Task> = {};
     for (const key in editedTask) {
         const fieldName = key as keyof Task;
         if (isEditable(fieldName)) {
-            // Special handling for assigneeId to also update assigneeName
             if (fieldName === 'assigneeId') {
-                const newAssigneeId = editedTask.assigneeId ?? null;
                 const selectedAssignee = assigneeOptions.find(opt => opt.uid === newAssigneeId);
                 updateData.assigneeId = newAssigneeId;
-                // Use optional chaining and nullish coalescing
                 updateData.assigneeName = selectedAssignee?.displayName ?? '';
             } else {
                (updateData as any)[fieldName] = (editedTask as any)[fieldName];
@@ -302,23 +294,33 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
         }
     }
 
-
     // Add updatedAt timestamp if there are changes
-     if (Object.keys(updateData).length > 0) {
+     if (Object.keys(updateData).length > 0 || assigneeChanged) {
         updateData.updatedAt = Timestamp.now();
      } else {
-         // If somehow we got here with no editable changes detected
          setIsSaving(false);
-         onClose();
+         onClose(); // No changes, just close
          return;
      }
 
     try {
+      // 1. Update the task document
       await updateDoc(taskRef, updateData);
+
+      // 2. If assignee changed and there's a new assignee, update the project's assignedUsers
+      // Note: Removing the old assignee from the array is more complex as it requires checking
+      // if they have other tasks in the project. For simplicity, we only add here.
+      // A background function could periodically clean up this array.
+      if (assigneeChanged && newAssigneeId) {
+        await updateDoc(projectRef, {
+          assignedUsers: arrayUnion(newAssigneeId)
+        });
+      }
+
       onTaskUpdate(); // Notify parent component (e.g., for toast)
       onClose(); // Close modal
     } catch (error) {
-      console.error("Error updating task:", error);
+      console.error("Error updating task or project:", error);
       toast({ title: "Error", description: "Failed to save changes.", variant: "destructive" });
     } finally {
       setIsSaving(false);
@@ -357,6 +359,10 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
 
       // Then delete the Firestore document
       await deleteDoc(taskRef);
+
+      // TODO: Consider removing user from project's assignedUsers if this was their last task.
+      // This is complex and might be better handled by a periodic cleanup function.
+
       toast({ title: "Task Deleted", description: `Task "${task.name}" and its attachments were successfully deleted.` });
       onClose(); // Close the modal after deletion
     } catch (error) {
@@ -380,23 +386,26 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
+      {/* Removed DialogTitle from here as requested for accessibility fix in dialog.tsx */}
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
         <DialogHeader>
-          {/* Wrap Input/span in DialogTitle */}
-           <DialogTitle>
-              {isEditable('name') ? (
-                <Input
-                  name="name"
-                  value={(getCurrentValue('name') as string) || ''}
-                  onChange={handleInputChange}
-                  className="text-lg font-semibold border-none p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0" // Style to look like text
-                  placeholder="Task Name"
-                  disabled={!isEditable('name') || isSaving || isDeleting}
-                />
-              ) : (
+           {/* Input or Span for Title */}
+           {isEditable('name') ? (
+             <DialogTitle>
+               <Input
+                 name="name"
+                 value={(getCurrentValue('name') as string) || ''}
+                 onChange={handleInputChange}
+                 className="text-lg font-semibold border-none p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0" // Style to look like text
+                 placeholder="Task Name"
+                 disabled={!isEditable('name') || isSaving || isDeleting}
+               />
+             </DialogTitle>
+           ) : (
+             <DialogTitle>
                 <span className="text-lg font-semibold">{task.name}</span>
-              )}
-           </DialogTitle>
+             </DialogTitle>
+           )}
           <DialogDescription>
             Manage task details, comments, and attachments.
           </DialogDescription>

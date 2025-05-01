@@ -36,7 +36,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton component
 import { Textarea } from "@/components/ui/textarea"; // Import Textarea
-import { useProjectContext } from '@/components/providers/project-provider'; // Import project context
+import { useProjectContext } from '@/components/providers/project-provider'; // Import ProjectProvider and context hook
 
 
 interface AppSidebarProps {}
@@ -56,11 +56,15 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
    if (db && user) {
      const projectsCollection = collection(db, 'projects') as CollectionReference<Project>;
      if (userRole === 'manager' || userRole === 'owner') {
+       // Managers and Owners see all projects
        projectsQuery = query(projectsCollection, orderBy('createdAt', 'desc'));
      } else if (userRole === 'employee') {
-       // Employees see all projects for Phase 1 simplicity. Refine later.
-        // TODO: Filter projects based on employee assignment later
-       projectsQuery = query(projectsCollection, orderBy('createdAt', 'desc'));
+       // Employees see projects where they are in the 'assignedUsers' array
+       projectsQuery = query(
+         projectsCollection,
+         where('assignedUsers', 'array-contains', user.uid),
+         orderBy('createdAt', 'desc')
+       );
      } else {
        // Handle cases where user role might not be set yet or is invalid
        projectsQuery = query(projectsCollection, where('__name__', '==', 'nonexistent'));
@@ -109,6 +113,7 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
         description: newProjectDescription.trim() || '',
         createdAt: Timestamp.now(),
         createdBy: user.uid, // Link project to the creator
+        assignedUsers: [], // Initialize with empty array
       });
       toast({ title: "Project Created", description: `"${newProjectName}" added successfully.` });
       setNewProjectName('');
@@ -204,27 +209,24 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
                     <p key="proj-error" className="text-xs text-destructive px-2">Error loading projects</p>
                  ) : !projects || projects.length === 0 ? (
                      <p key="proj-empty" className="text-xs text-muted-foreground px-2 italic">
-                          {userRole === 'manager' || userRole === 'owner' ? 'No projects yet. Add one!' : 'No projects found.'}
+                          {userRole === 'manager' || userRole === 'owner' ? 'No projects yet. Add one!' : 'No projects found or assigned.'}
                      </p>
                  ) : (
                      // Project list
-                     <>
-                        {/* Removed "View All Projects" Item */}
-                         {projects.map((project) => (
-                             <SidebarMenuItem key={project.id}> {/* Use project.id as key */}
-                                 <SidebarMenuButton
-                                     onClick={() => handleSelectProject(project.id)}
-                                     isActive={selectedProjectId === project.id} // Use context state for isActive
-                                     tooltip={{ children: project.name }} // Show tooltip when collapsed
-                                     className="justify-start group-data-[collapsible=icon]:justify-center"
-                                 >
-                                     {/* Using FolderKanban, but could be FileText based on image */}
-                                     <FolderKanban className="flex-shrink-0" />
-                                     <span className="truncate">{project.name}</span>
-                                 </SidebarMenuButton>
-                             </SidebarMenuItem>
-                         ))}
-                     </>
+                     projects.map((project) => (
+                         <SidebarMenuItem key={project.id}> {/* Use project.id as key */}
+                             <SidebarMenuButton
+                                 onClick={() => handleSelectProject(project.id)}
+                                 isActive={selectedProjectId === project.id} // Use context state for isActive
+                                 tooltip={{ children: project.name }} // Show tooltip when collapsed
+                                 className="justify-start group-data-[collapsible=icon]:justify-center"
+                             >
+                                 {/* Using FolderKanban, but could be FileText based on image */}
+                                 <FolderKanban className="flex-shrink-0" />
+                                 <span className="truncate">{project.name}</span>
+                             </SidebarMenuButton>
+                         </SidebarMenuItem>
+                     ))
                  )}
              </SidebarMenu>
          </SidebarGroup>

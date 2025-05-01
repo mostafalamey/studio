@@ -15,7 +15,7 @@ import { format } from 'date-fns';
 import { cn } from "@/lib/utils";
 import type { Priority, AppUser } from '@/lib/types';
 import { useFirebase } from '@/components/providers/firebase-provider';
-import { collection, addDoc, Timestamp, getDocs, query, doc, setDoc } from 'firebase/firestore'; // Added doc, setDoc
+import { collection, addDoc, Timestamp, getDocs, query, doc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore'; // Added doc, setDoc, updateDoc, arrayUnion
 import { useToast } from '@/hooks/use-toast';
 
 interface AddTaskModalProps {
@@ -83,14 +83,13 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, projectId,
     const selectedAssignee = assigneeOptions.find(opt => opt.uid === assigneeId);
 
     try {
+      // 1. Create the task document
       const tasksCollection = collection(db, 'tasks');
-      // Generate a new doc ref to get the ID *before* saving
       const newTaskRef = doc(tasksCollection);
       const newTaskId = newTaskRef.id;
 
       await setDoc(newTaskRef, {
         id: newTaskId, // Store the generated ID within the document
-        // taskId: newTaskId, // Remove explicit taskId field
         projectId: projectId,
         name: taskName.trim(),
         dueDate: dueDate ? Timestamp.fromDate(dueDate) : null,
@@ -102,14 +101,22 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, projectId,
         columnId: 'todo', // Default to 'todo' column
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
-        createdBy: user.uid, // Add creator info if needed
+        createdBy: user.uid,
       });
+
+      // 2. If an assignee exists, update the project's assignedUsers array
+      if (assigneeId) {
+        const projectRef = doc(db, 'projects', projectId);
+        await updateDoc(projectRef, {
+          assignedUsers: arrayUnion(assigneeId) // Add the assignee's ID
+        });
+      }
 
       onTaskAdd(taskName.trim()); // Notify parent component
       onClose(); // Close modal
 
     } catch (error) {
-      console.error("Error adding task:", error);
+      console.error("Error adding task or updating project:", error);
       toast({ title: "Error", description: "Failed to add task.", variant: "destructive" });
     } finally {
       setIsSaving(false);

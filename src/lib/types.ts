@@ -14,11 +14,11 @@ export interface Project {
   description?: string; // Optional description
   createdAt: Timestamp;
   createdBy: string; // User ID of the creator
+  assignedUsers?: string[]; // Array of user IDs who have tasks in this project
 }
 
 export interface Task {
   id: string;
-  // taskId: string; // Remove explicit task ID field
   projectId: string;
   name: string; // Renamed from title
   dueDate: Timestamp | null; // Storing as Timestamp for easier querying/sorting
