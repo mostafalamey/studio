@@ -19,7 +19,7 @@ import {
   SidebarMenuSkeleton,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { LogOut, FolderKanban, PlusCircle, LayoutDashboard, Users, FileText, MoreHorizontal, Trash2 } from 'lucide-react'; // Added MoreHorizontal, Trash2
+import { LogOut, FolderKanban, PlusCircle, LayoutDashboard, Users, FileText, MoreHorizontal, Trash2, Sun, Moon } from 'lucide-react'; // Added Sun, Moon
 import { useFirebase } from '@/components/providers/firebase-provider';
 import { useCollectionData } from 'react-firebase-hooks/firestore';
 import { collection, query, orderBy, where, addDoc, Timestamp, FirestoreError, CollectionReference, Query, FieldPath, doc, setDoc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore'; // Added deleteDoc, getDocs, writeBatch
@@ -58,7 +58,8 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton component
 import { Textarea } from "@/components/ui/textarea"; // Import Textarea
 import { useProjectContext } from '@/components/providers/project-provider'; // Import project context hook
-
+import { Switch } from "@/components/ui/switch"; // Import Switch
+import { useTheme } from "next-themes"; // Import useTheme
 
 interface AppSidebarProps {}
 
@@ -75,6 +76,8 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const { selectedProjectId, setSelectedProjectId } = useProjectContext();
   const pathname = usePathname(); // Get current pathname
+  const { theme, setTheme } = useTheme();
+  const [isMounted, setIsMounted] = useState(false); // To prevent hydration mismatch for theme
 
    // --- Project Fetching Logic ---
    const [projectsQuery, setProjectsQuery] = useState<Query | null>(null);
@@ -148,6 +151,11 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
             });
         }
     }, [projectsError, toast]);
+
+   // Prevent hydration mismatch for theme switcher
+   useEffect(() => {
+      setIsMounted(true);
+    }, []);
 
 
    const handleSelectProject = (projectId: string | null) => {
@@ -272,6 +280,41 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
     if (!name) return '?';
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
+
+  if (!isMounted) {
+      // Render a skeleton or null during SSR/initial client render to avoid theme mismatch
+      return (
+          <Sidebar side="left" variant="sidebar" collapsible="icon" className="border-r border-sidebar-border">
+              <SidebarHeader className="flex items-center justify-center h-24 border-b border-sidebar-border px-4 py-16">
+                  <div className="flex flex-col items-center gap-2">
+                       <Skeleton className="w-16 h-16 rounded-full" />
+                       <Skeleton className="h-6 w-20 mt-2" />
+                   </div>
+              </SidebarHeader>
+              <SidebarContent className="p-0">
+                   <SidebarGroup className="p-2 pt-4">
+                      <Skeleton className="h-6 w-1/3 mb-2" />
+                       <Skeleton className="h-9 w-full mb-2" />
+                       <SidebarMenuSkeleton showIcon />
+                       <SidebarMenuSkeleton showIcon />
+                   </SidebarGroup>
+                    <SidebarGroup className="p-2">
+                       <Skeleton className="h-6 w-1/3 mb-2" />
+                       <SidebarMenuSkeleton showIcon />
+                       <SidebarMenuSkeleton showIcon />
+                   </SidebarGroup>
+              </SidebarContent>
+               <SidebarFooter className="p-2 mt-auto border-t border-sidebar-border">
+                   {/* Skeleton for Theme switch */}
+                    <div className="flex items-center justify-center p-2 space-x-2 group-data-[collapsible=icon]:justify-center">
+                       <Skeleton className="w-5 h-5 rounded" />
+                       <Skeleton className="w-11 h-6 rounded-full" />
+                       <Skeleton className="w-5 h-5 rounded" />
+                    </div>
+               </SidebarFooter>
+          </Sidebar>
+      );
+   }
 
 
   return (
@@ -449,9 +492,30 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
          </SidebarGroup>
       </SidebarContent>
 
-       {/* Footer - Removed User Info and Logout */}
+       {/* Footer - Theme Switch */}
       <SidebarFooter className="p-2 mt-auto border-t border-sidebar-border">
-         {/* Content removed */}
+         <div className="flex items-center justify-center p-2 space-x-2 group-data-[collapsible=icon]:justify-center">
+           <Sun className="h-5 w-5 text-muted-foreground group-data-[collapsible=icon]:hidden" />
+           <Switch
+             id="theme-switch"
+             checked={theme === 'dark'}
+             onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+             aria-label="Toggle theme"
+             className="group-data-[collapsible=icon]:hidden"
+           />
+           <Moon className="h-5 w-5 text-muted-foreground group-data-[collapsible=icon]:hidden" />
+           {/* Icon-only version when collapsed */}
+           <Button
+                variant="ghost"
+                size="icon"
+                className="hidden group-data-[collapsible=icon]:flex h-8 w-8"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                title="Toggle Theme"
+            >
+                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                <span className="sr-only">Toggle Theme</span>
+           </Button>
+         </div>
       </SidebarFooter>
 
         {/* Delete Project Confirmation Dialog */}

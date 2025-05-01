@@ -8,6 +8,7 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'; // Impo
 import AppSidebar from '@/components/app-sidebar';
 import AppHeader from '@/components/app-header'; // Import AppHeader
 import { ProjectProvider } from '@/components/providers/project-provider'; // Import ProjectProvider
+import { ThemeProvider } from "@/components/providers/theme-provider"; // Import ThemeProvider
 
 const inter = Inter({
   variable: '--font-inter', // Use Inter font variable
@@ -27,23 +28,30 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning={true}>{/* Add suppressHydrationWarning here */}
       <body className={`${inter.variable} font-sans antialiased h-screen flex flex-col`} suppressHydrationWarning={true}> {/* Use Inter font, add suppressHydrationWarning, ensure full height and flex column */}
-        <FirebaseProvider>
-          <ProjectProvider> {/* Wrap with ProjectProvider */}
-            <SidebarProvider defaultOpen={true}> {/* Wrap with SidebarProvider */}
-              <div className="flex flex-1 overflow-hidden"> {/* Main container for sidebar + content, prevent body scroll */}
-                <AppSidebar /> {/* Add the AppSidebar */}
-                <SidebarInset className="flex flex-col flex-1 overflow-hidden"> {/* Use SidebarInset for main content area, flex-1, overflow hidden */}
-                  <AppHeader /> {/* Add the AppHeader */}
-                  {/* Remove redundant main tag, let children fill the space */}
-                  <div className="flex-1 overflow-y-auto"> {/* Make this div scrollable instead of main */}
-                     {children}
-                  </div>
-                </SidebarInset>
-              </div>
-              <Toaster />
-            </SidebarProvider>
-          </ProjectProvider>
-        </FirebaseProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <FirebaseProvider>
+            <ProjectProvider> {/* Wrap with ProjectProvider */}
+              <SidebarProvider defaultOpen={true}> {/* Wrap with SidebarProvider */}
+                <div className="flex flex-1 overflow-hidden"> {/* Main container for sidebar + content, prevent body scroll */}
+                  <AppSidebar /> {/* Add the AppSidebar */}
+                  <SidebarInset className="flex flex-col flex-1 overflow-hidden"> {/* Use SidebarInset for main content area, flex-1, overflow hidden */}
+                    <AppHeader /> {/* Add the AppHeader */}
+                    {/* Remove redundant main tag, let children fill the space */}
+                    <div className="flex-1 overflow-y-auto"> {/* Make this div scrollable instead of main */}
+                       {children}
+                    </div>
+                  </SidebarInset>
+                </div>
+                <Toaster />
+              </SidebarProvider>
+            </ProjectProvider>
+          </FirebaseProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
