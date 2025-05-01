@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -22,7 +23,14 @@ import ChatInterface from '@/components/chat/chat-interface'; // Import ChatInte
 import { cn } from '@/lib/utils'; // Import cn
 
 // Sub-component for displaying and managing teams (Managers/Owners)
-const TeamsManager: React.FC<{ users: AppUser[], teams: Team[] | undefined, teamsLoading: boolean, teamsError: Error | undefined, onSelectTeam: (team: Team) => void }> = ({ users, teams, teamsLoading, teamsError, onSelectTeam }) => {
+const TeamsManager: React.FC<{
+    users: AppUser[],
+    teams: Team[] | undefined,
+    teamsLoading: boolean,
+    teamsError: Error | undefined,
+    onSelectTeam: (team: Team) => void,
+    selectedChatTargetId: string | null // Added prop
+}> = ({ users, teams, teamsLoading, teamsError, onSelectTeam, selectedChatTargetId }) => {
     const { db, userRole } = useFirebase();
     const { toast } = useToast();
     const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
@@ -926,6 +934,7 @@ export default function TeamPage() {
                                      teamsLoading={teamsLoading}
                                      teamsError={teamsError}
                                      onSelectTeam={handleSelectTeam}
+                                     selectedChatTargetId={selectedChatTarget?.id || null} // Pass selectedChatTargetId
                                  />
                                  {userRole === 'owner' && (
                                       <div className="mt-12 pt-8 border-t">
@@ -967,3 +976,4 @@ export default function TeamPage() {
         </div>
     );
 }
+
