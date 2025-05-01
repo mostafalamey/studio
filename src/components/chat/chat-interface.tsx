@@ -112,8 +112,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
       };
 
     return (
+        // Use h-full to take full height of its flex container
         <Card className="flex flex-col h-full border-l rounded-none"> {/* Full height, remove right border */}
-            <CardHeader className="flex flex-row items-center justify-between border-b p-4">
+            <CardHeader className="flex flex-row items-center justify-between border-b p-4 flex-shrink-0"> {/* Prevent header shrinking */}
                 <CardTitle className="text-lg">{targetName}</CardTitle>
                 <Button variant="ghost" size="icon" onClick={onClose}>
                     <X className="w-5 h-5" />
@@ -137,7 +138,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
                     return (
                         <div key={msg.id} className={`flex items-end space-x-2 ${isSender ? 'justify-end' : 'justify-start'}`}>
                              {!isSender && (
-                                <Avatar className="h-6 w-6 self-start">
+                                <Avatar className="h-6 w-6 self-start flex-shrink-0"> {/* Prevent avatar shrinking */}
                                      <AvatarFallback className="text-xs bg-muted">{getInitials(msg.senderName)}</AvatarFallback>
                                 </Avatar>
                              )}
@@ -149,7 +150,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
                                 </p>
                             </div>
                              {isSender && (
-                                <Avatar className="h-6 w-6 self-start">
+                                <Avatar className="h-6 w-6 self-start flex-shrink-0"> {/* Prevent avatar shrinking */}
                                     <AvatarFallback className="text-xs bg-primary text-primary-foreground">{getInitials(user?.displayName || user?.email)}</AvatarFallback>
                                 </Avatar>
                              )}
@@ -158,7 +159,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
                 })}
                 <div ref={messagesEndRef} /> {/* For auto-scrolling */}
             </CardContent>
-            <CardFooter className="p-4 border-t">
+            <CardFooter className="p-4 border-t flex-shrink-0"> {/* Prevent footer shrinking */}
                 <form onSubmit={handleSendMessage} className="flex w-full space-x-2">
                     <Input
                         placeholder="Type your message..."
@@ -178,3 +179,4 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ targetId, targetType, tar
 };
 
 export default ChatInterface;
+

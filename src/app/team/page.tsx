@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import type { AppUser, UserRole, Team } from '@/lib/types';
-import { PlusCircle, Trash2, Edit, Users, UserPlus, ChevronRight, MessageSquare } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Users, UserPlus, ChevronRight, MessageSquare, ArrowLeft } from 'lucide-react'; // Added ArrowLeft
 import { Badge } from '@/components/ui/badge';
 import Login from '@/components/auth/login';
 import ChatInterface from '@/components/chat/chat-interface'; // Import ChatInterface
@@ -87,7 +87,7 @@ const TeamsManager: React.FC<{ users: AppUser[], teams: Team[] | undefined, team
                 toast({ title: "Team Updated", description: `Team "${teamData.name}" updated successfully.` });
             } else {
                 const teamRef = doc(collection(db, 'teams'));
-                await setDoc(teamRef, { ...teamData, id: teamRef.id });
+                await setDoc(teamRef, { ...teamData, id: teamRef.id }); // Ensure ID is saved
                 toast({ title: "Team Created", description: `Team "${teamData.name}" created successfully.` });
             }
             closeTeamModal();
@@ -102,7 +102,7 @@ const TeamsManager: React.FC<{ users: AppUser[], teams: Team[] | undefined, team
     const handleDeleteTeam = async () => {
         if (!db || !teamToDelete) return;
 
-        setIsSavingTeam(true);
+        setIsSavingTeam(true); // Use isSavingTeam to disable buttons during delete
         const teamRef = doc(db, 'teams', teamToDelete.id);
 
         try {
@@ -350,23 +350,28 @@ const TeamMembersList: React.FC<{ team: Team, users: AppUser[], onSelectUser: (u
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={onBack}>&larr; Back to Teams</Button>
-                <h2 className="text-2xl font-semibold">{team.name} Members</h2>
+            <div className="flex items-center gap-2 mb-4"> {/* Added margin bottom */}
+                 <Button variant="ghost" size="sm" onClick={onBack} className="flex items-center">
+                    <ArrowLeft className="w-4 h-4 mr-1"/> Back to Teams
+                 </Button>
             </div>
+             <h2 className="text-2xl font-semibold">{team.name} Members</h2>
+
+             {/* Card to initiate team chat - Keep this even when chat is active? */}
              <Card className="hover:shadow-md transition-shadow cursor-pointer bg-secondary" onClick={() => onSelectTeamChat(team)}>
-                <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                        Chat with "{team.name}" Team
-                        <MessageSquare className="w-5 h-5 text-primary" />
-                    </CardTitle>
-                </CardHeader>
-            </Card>
+                 <CardHeader>
+                     <CardTitle className="flex items-center justify-between text-base"> {/* Adjusted text size */}
+                         Chat with "{team.name}" Team
+                         <MessageSquare className="w-5 h-5 text-primary" />
+                     </CardTitle>
+                 </CardHeader>
+             </Card>
+             {/* List of members */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {teamMembers.map(member => (
                     <Card key={member.uid} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onSelectUser(member)}>
                         <CardHeader>
-                            <CardTitle className="flex items-center justify-between">
+                            <CardTitle className="flex items-center justify-between text-base"> {/* Adjusted text size */}
                                 {member.displayName || member.email}
                                 <ChevronRight className="w-5 h-5 text-muted-foreground" />
                             </CardTitle>
@@ -414,7 +419,7 @@ const EmployeeTeamView: React.FC<{ currentUser: AppUser, users: AppUser[], teams
                 {teammates.map(member => (
                     <Card key={member.uid} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onSelectUser(member)}>
                         <CardHeader>
-                            <CardTitle className="flex items-center justify-between">
+                            <CardTitle className="flex items-center justify-between text-base"> {/* Adjusted text size */}
                                 {member.displayName || member.email}
                                 <ChevronRight className="w-5 h-5 text-muted-foreground" />
                             </CardTitle>
@@ -434,8 +439,8 @@ const EmployeeTeamView: React.FC<{ currentUser: AppUser, users: AppUser[], teams
 // Main Team Page Component
 export default function TeamPage() {
     const { db, user, userRole, loading: authLoading } = useFirebase();
-    const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
-    const [selectedChatTarget, setSelectedChatTarget] = useState<{ id: string; type: 'user' | 'team'; name: string } | null>(null);
+    const [selectedTeam, setSelectedTeam] = useState<Team | null>(null); // Team whose members are being viewed
+    const [selectedChatTarget, setSelectedChatTarget] = useState<{ id: string; type: 'user' | 'team'; name: string } | null>(null); // Target for the active chat
 
     // Fetch all users
     const usersQuery = db ? query(collection(db, 'users') as CollectionReference<AppUser>, orderBy('displayName')) : null;
@@ -445,34 +450,38 @@ export default function TeamPage() {
     const teamsQuery = db ? query(collection(db, 'teams') as CollectionReference<Team>, orderBy('name')) : null;
     const [teams, teamsLoading, teamsError] = useCollectionData<Team>(teamsQuery, { idField: 'id' });
 
+    // Select a team to view its members (Managers/Owners)
     const handleSelectTeam = (team: Team) => {
         setSelectedTeam(team);
-        setSelectedChatTarget(null); // Clear chat when selecting team members view
+        setSelectedChatTarget(null); // Clear any active chat when viewing team members
     };
 
+    // Select a user to start a 1-on-1 chat
     const handleSelectUser = (userToChat: AppUser) => {
         setSelectedChatTarget({ id: userToChat.uid, type: 'user', name: userToChat.displayName || userToChat.email || 'User' });
-        setSelectedTeam(null); // Clear team selection when selecting user chat
+        // Don't clear selectedTeam necessarily, keep the context if needed, or clear based on desired UX.
+        // Let's keep selectedTeam so the 'Back' button in TeamMembersList works correctly if chat started from there.
     };
 
+    // Select a team to start a group chat
      const handleSelectTeamChat = (team: Team) => {
         setSelectedChatTarget({ id: team.id, type: 'team', name: `${team.name} (Team Chat)` });
-        // Keep selectedTeam potentially, or clear it based on desired flow
-         setSelectedTeam(null); // Let's clear team member view when starting team chat
+        // Keep selectedTeam set so the TeamMembersList can be displayed alongside chat on wider screens.
+        setSelectedTeam(team); // Ensure the context of the team is kept
      };
 
-    const handleBackToTeams = () => {
+    // Go back from member list/chat to the main team management view
+    const handleBackToDefaultView = () => {
         setSelectedTeam(null);
         setSelectedChatTarget(null);
     };
 
+    // Close the chat interface (invoked by ChatInterface component)
      const handleCloseChat = () => {
         setSelectedChatTarget(null);
-        // Decide where to navigate back to. Maybe back to team list/members?
-        // For simplicity, let's just clear the chat for now.
-        // If a team was previously selected to view members, we might want to restore that view.
-        // Or simply go back to the main team management/list view.
-        // handleBackToTeams(); // Option: Go back to default view
+        // Decide where to navigate back. If a team was selected, go back to its member list. Otherwise, go to default view.
+        // If !selectedTeam, handleBackToDefaultView() was likely called already implicitly by selecting a user from main list.
+        // No explicit action needed here other than clearing the chat target.
      };
 
     if (authLoading || usersLoading || teamsLoading) { // Check all loading states
@@ -500,16 +509,30 @@ export default function TeamPage() {
      const currentUserDetails = users?.find(u => u.uid === user.uid);
 
 
-    // Main content layout: Sidebar/List on left, Chat on right
+    // Main content layout: Two-pane layout
      return (
-        <div className="flex h-[calc(100vh-4rem)]"> {/* Adjust height based on header */}
+        // Adjust height based on header height (assuming 4rem / h-16)
+        <div className="flex h-[calc(100vh-4rem)]">
 
-            {/* Left Panel: Team/User List or Role Management */}
-            <div className={`p-4 md:p-6 space-y-8 overflow-y-auto ${selectedChatTarget ? 'hidden md:block md:w-1/3 lg:w-1/4 xl:w-1/5 border-r' : 'w-full'}`}>
-                <h1 className="text-3xl font-bold">Team</h1>
+            {/* Left Panel: Navigation/List View */}
+            {/* Conditionally hide this panel on mobile when chat is active */}
+            <div className={`
+                ${selectedChatTarget ? 'hidden md:block md:w-1/3 lg:w-1/4' : 'w-full'}
+                 p-4 md:p-6 space-y-8 overflow-y-auto border-r
+            `}>
+                {/* Back button to go to default view if a team or chat is selected */}
+                {(selectedTeam || selectedChatTarget) && (
+                    <Button variant="ghost" size="sm" onClick={handleBackToDefaultView} className="mb-4 flex items-center">
+                        <ArrowLeft className="w-4 h-4 mr-1" /> Back to {userRole === 'employee' ? 'Team View' : 'Teams List'}
+                    </Button>
+                )}
+
+                {!selectedChatTarget && ( // Only show title/management if chat is NOT active
+                     <h1 className="text-3xl font-bold mb-6">Team</h1>
+                 )}
 
                 {/* Employee View */}
-                {userRole === 'employee' && currentUserDetails && users && (
+                {userRole === 'employee' && currentUserDetails && users && !selectedChatTarget && (
                     <EmployeeTeamView
                         currentUser={currentUserDetails}
                         users={users}
@@ -521,49 +544,50 @@ export default function TeamPage() {
                  {/* Manager/Owner View */}
                  {(userRole === 'manager' || userRole === 'owner') && users && (
                      <>
-                         {!selectedTeam ? (
-                            <TeamsManager
-                                users={users}
-                                teams={teams}
-                                teamsLoading={teamsLoading}
-                                teamsError={teamsError}
-                                onSelectTeam={handleSelectTeam}
-                            />
-                         ) : (
+                         {!selectedTeam && !selectedChatTarget ? ( // Default view: Show TeamsManager and RolesManager
+                            <>
+                                <TeamsManager
+                                    users={users}
+                                    teams={teams}
+                                    teamsLoading={teamsLoading}
+                                    teamsError={teamsError}
+                                    onSelectTeam={handleSelectTeam}
+                                />
+                                {userRole === 'owner' && (
+                                     <div className="mt-12 pt-8 border-t">
+                                         <RolesManager
+                                             users={users}
+                                             usersLoading={usersLoading}
+                                             usersError={usersError}
+                                         />
+                                     </div>
+                                 )}
+                            </>
+                         ) : selectedTeam ? ( // Team selected: Show TeamMembersList
                              <TeamMembersList
                                 team={selectedTeam}
                                 users={users}
-                                onSelectUser={handleSelectUser}
-                                onSelectTeamChat={handleSelectTeamChat}
-                                onBack={handleBackToTeams}
-                            />
-                         )}
-
-                         {/* Role Management (Owners Only) - Show below team management */}
-                         {userRole === 'owner' && !selectedTeam && ( // Show only in main team view
-                             <div className="mt-12 pt-8 border-t">
-                                 <RolesManager
-                                     users={users}
-                                     usersLoading={usersLoading}
-                                     usersError={usersError}
-                                 />
-                             </div>
-                         )}
+                                onSelectUser={handleSelectUser} // Allows starting 1-on-1 chat from member list
+                                onSelectTeamChat={handleSelectTeamChat} // Allows starting team chat
+                                onBack={handleBackToDefaultView} // Back to team list
+                             />
+                         ) : null } {/* If only chat is selected but no team, left panel might be blank or show something else */}
                      </>
                  )}
             </div>
 
             {/* Right Panel: Chat Interface */}
             {selectedChatTarget && (
-                <div className="flex-grow"> {/* Chat takes remaining space */}
-                     <ChatInterface
-                        targetId={selectedChatTarget.id}
-                        targetType={selectedChatTarget.type}
-                        targetName={selectedChatTarget.name}
-                        onClose={handleCloseChat}
-                    />
-                </div>
-            )}
+                 <div className="flex-grow"> {/* Chat takes remaining space */}
+                      <ChatInterface
+                         targetId={selectedChatTarget.id}
+                         targetType={selectedChatTarget.type}
+                         targetName={selectedChatTarget.name}
+                         onClose={handleCloseChat} // Use the handler to clear the chat target
+                     />
+                 </div>
+             )}
         </div>
     );
 }
+        
