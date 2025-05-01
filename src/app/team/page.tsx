@@ -346,12 +346,12 @@ const RolesManager: React.FC<{ users: AppUser[], usersLoading: boolean, usersErr
 };
 
 // Sub-component for displaying team members and initiating chat (Managers/Owners)
-const TeamMembersList: React.FC<{ team: Team, users: AppUser[], onSelectUser: (user: AppUser) => void, onSelectTeamChat: (team: Team) => void, onBack: () => void }> = ({ team, users, onSelectUser, onSelectTeamChat, onBack }) => {
+const TeamMembersList: React.FC<{ team: Team, users: AppUser[], onSelectUser: (user: AppUser) => void, onSelectTeamChat: (team: Team) => void }> = ({ team, users, onSelectUser, onSelectTeamChat }) => {
     const teamMembers = users.filter(user => team.members?.includes(user.uid));
 
     return (
         <div className="space-y-6">
-             {/* Back button is handled globally now */}
+             {/* Removed Back button - handled globally */}
              <h2 className="text-2xl font-semibold">{team.name} Members</h2>
 
              {/* Card to initiate team chat */}
@@ -368,9 +368,9 @@ const TeamMembersList: React.FC<{ team: Team, users: AppUser[], onSelectUser: (u
                 {teamMembers.map(member => (
                     <Card key={member.uid} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onSelectUser(member)}>
                         <CardHeader>
-                            <CardTitle className="flex items-center justify-between text-base"> {/* Adjusted text size */}
+                            <CardTitle className="flex items-center justify-between text-base truncate"> {/* Added truncate */}
                                 {member.displayName || member.email}
-                                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                                <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" /> {/* Prevent shrinking */}
                             </CardTitle>
                              <CardDescription className="truncate">{member.role}</CardDescription> {/* Added truncate */}
                         </CardHeader>
@@ -416,9 +416,9 @@ const EmployeeTeamView: React.FC<{ currentUser: AppUser, users: AppUser[], teams
                 {teammates.map(member => (
                     <Card key={member.uid} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onSelectUser(member)}>
                         <CardHeader>
-                            <CardTitle className="flex items-center justify-between text-base"> {/* Adjusted text size */}
+                            <CardTitle className="flex items-center justify-between text-base truncate"> {/* Added truncate */}
                                 {member.displayName || member.email}
-                                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                                <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" /> {/* Prevent shrinking */}
                             </CardTitle>
                             <CardDescription className="truncate">{member.role}</CardDescription> {/* Added truncate */}
                         </CardHeader>
@@ -503,13 +503,13 @@ export default function TeamPage() {
             {/* Left Panel: Navigation/List View */}
             <div className={cn(
                 `p-4 md:p-6 space-y-8 overflow-y-auto border-r transition-all duration-300 ease-in-out`,
-                 selectedChatTarget ? 'w-1/3 lg:w-1/4' : 'w-full' // Wider when no chat active
+                selectedChatTarget ? 'w-1/3 lg:w-1/4 flex flex-col' : 'w-full' // Apply flex-col when chat is active
                  // Always visible on md+ screens, hidden on mobile if chat is active
                  // selectedChatTarget ? 'hidden md:block' : 'block'
             )}>
                 {/* Back button displayed when a team is selected or chat is active */}
                 {(selectedTeam || selectedChatTarget) && (
-                    <Button variant="ghost" size="sm" onClick={handleBackToDefaultView} className="mb-4 flex items-center">
+                    <Button variant="ghost" size="sm" onClick={handleBackToDefaultView} className="mb-4 flex items-center flex-shrink-0"> {/* Prevent shrinking */}
                         <ArrowLeft className="w-4 h-4 mr-1" /> Back to {userRole === 'employee' ? 'Team View' : 'Teams List'}
                     </Button>
                 )}
@@ -562,7 +562,7 @@ export default function TeamPage() {
                                 users={users}
                                 onSelectUser={handleSelectUser}
                                 onSelectTeamChat={handleSelectTeamChat}
-                                onBack={handleBackToDefaultView} // This might not be needed if global back button is used
+                               // Removed onBack prop as global back button handles this
                              />
                          )}
                      </>
