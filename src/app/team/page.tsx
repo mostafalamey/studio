@@ -151,10 +151,10 @@ const TeamsManager: React.FC<{ users: AppUser[], teams: Team[] | undefined, team
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {teams?.map(team => (
-                    <Card key={team.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onSelectTeam(team)}>
+                    <Card key={team.id} className="hover:shadow-md transition-shadow cursor-pointer bg-secondary" onClick={() => onSelectTeam(team)}> {/* Added bg-secondary */}
                         <CardHeader>
                             <div className="flex justify-between items-start">
-                                <CardTitle>{team.name}</CardTitle>
+                                <CardTitle className="truncate">{team.name}</CardTitle> {/* Added truncate */}
                                 <div className="flex space-x-1">
                                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openEditTeamModal(team); }}>
                                         <Edit className="w-4 h-4" />
@@ -346,7 +346,7 @@ const RolesManager: React.FC<{ users: AppUser[], usersLoading: boolean, usersErr
 };
 
 // Sub-component for displaying team members and initiating chat (Managers/Owners)
-const TeamMembersList: React.FC<{ team: Team, users: AppUser[], onSelectUser: (user: AppUser) => void, onSelectTeamChat: (team: Team) => void }> = ({ team, users, onSelectUser, onSelectTeamChat }) => {
+const TeamMembersList: React.FC<{ team: Team, users: AppUser[], onSelectUser: (user: AppUser) => void, onSelectTeamChat: (team: Team) => void, isChatActive: boolean }> = ({ team, users, onSelectUser, onSelectTeamChat, isChatActive }) => {
     const teamMembers = users.filter(user => team.members?.includes(user.uid));
 
     return (
@@ -355,7 +355,7 @@ const TeamMembersList: React.FC<{ team: Team, users: AppUser[], onSelectUser: (u
              <h2 className="text-2xl font-semibold">{team.name} Members</h2>
 
              {/* Card to initiate team chat */}
-             <Card className="hover:shadow-md transition-shadow cursor-pointer bg-secondary" onClick={() => onSelectTeamChat(team)}>
+             <Card className="hover:shadow-md transition-shadow cursor-pointer bg-secondary" onClick={() => onSelectTeamChat(team)}> {/* Added bg-secondary */}
                  <CardHeader>
                      <CardTitle className="flex items-center justify-between text-base"> {/* Adjusted text size */}
                          Chat with "{team.name}" Team
@@ -364,9 +364,13 @@ const TeamMembersList: React.FC<{ team: Team, users: AppUser[], onSelectUser: (u
                  </CardHeader>
              </Card>
              {/* List of members */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+             {/* Use flex-col when chat is active, grid otherwise */}
+            <div className={cn(
+                "gap-4",
+                isChatActive ? "flex flex-col" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+            )}>
                 {teamMembers.map(member => (
-                    <Card key={member.uid} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onSelectUser(member)}>
+                    <Card key={member.uid} className="hover:shadow-md transition-shadow cursor-pointer bg-secondary" onClick={() => onSelectUser(member)}> {/* Added bg-secondary */}
                         <CardHeader>
                             <CardTitle className="flex items-center justify-between text-base truncate"> {/* Added truncate */}
                                 {member.displayName || member.email}
@@ -385,7 +389,7 @@ const TeamMembersList: React.FC<{ team: Team, users: AppUser[], onSelectUser: (u
 };
 
 // Sub-component for employees to see their teammates and initiate chat
-const EmployeeTeamView: React.FC<{ currentUser: AppUser, users: AppUser[], teams: Team[] | undefined, onSelectUser: (user: AppUser) => void }> = ({ currentUser, users, teams, onSelectUser }) => {
+const EmployeeTeamView: React.FC<{ currentUser: AppUser, users: AppUser[], teams: Team[] | undefined, onSelectUser: (user: AppUser) => void, isChatActive: boolean }> = ({ currentUser, users, teams, onSelectUser, isChatActive }) => {
     const [myTeam, setMyTeam] = useState<Team | null>(null);
     const [teammates, setTeammates] = useState<AppUser[]>([]);
 
@@ -412,9 +416,13 @@ const EmployeeTeamView: React.FC<{ currentUser: AppUser, users: AppUser[], teams
     return (
         <div className="space-y-6">
             <h2 className="text-2xl font-semibold">My Team: {myTeam.name}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+             {/* Use flex-col when chat is active, grid otherwise */}
+             <div className={cn(
+                 "gap-4",
+                 isChatActive ? "flex flex-col" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+             )}>
                 {teammates.map(member => (
-                    <Card key={member.uid} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onSelectUser(member)}>
+                    <Card key={member.uid} className="hover:shadow-md transition-shadow cursor-pointer bg-secondary" onClick={() => onSelectUser(member)}> {/* Added bg-secondary */}
                         <CardHeader>
                             <CardTitle className="flex items-center justify-between text-base truncate"> {/* Added truncate */}
                                 {member.displayName || member.email}
@@ -474,7 +482,8 @@ export default function TeamPage() {
         setSelectedChatTarget(null);
      };
 
-    if (authLoading || usersLoading || teamsLoading) {
+    if (authLoading) {
+         // Show loading skeleton only for authentication
         return (
             <div className="p-6 space-y-6">
                 <Skeleton className="h-8 w-1/2" />
@@ -487,9 +496,35 @@ export default function TeamPage() {
         );
     }
 
+
     if (!user) {
         return <Login />;
     }
+
+     if (usersLoading || teamsLoading) {
+         // Separate skeleton for data loading after auth
+         return (
+             <div className="p-6 space-y-6">
+                 <Skeleton className="h-8 w-1/2" />
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                     <Skeleton className="h-40 rounded-lg" />
+                     <Skeleton className="h-40 rounded-lg" />
+                     <Skeleton className="h-40 rounded-lg" />
+                 </div>
+                 {userRole === 'owner' && (
+                      <div className="mt-12 pt-8 border-t space-y-4">
+                          <Skeleton className="h-8 w-1/3 mb-4" />
+                          {[1, 2].map(i => (
+                              <div key={`user-skel-${i}`} className="flex justify-between items-center p-4 border rounded-lg">
+                                  <Skeleton className="h-5 w-2/5" />
+                                  <Skeleton className="h-9 w-24" />
+                              </div>
+                          ))}
+                      </div>
+                 )}
+             </div>
+         );
+     }
 
      if (usersError) return <p className="text-destructive p-6">Error loading users: {usersError.message}</p>;
 
@@ -503,9 +538,7 @@ export default function TeamPage() {
             {/* Left Panel: Navigation/List View */}
             <div className={cn(
                 `p-4 md:p-6 space-y-8 overflow-y-auto border-r transition-all duration-300 ease-in-out`,
-                selectedChatTarget ? 'w-1/3 lg:w-1/4 flex flex-col' : 'w-full' // Apply flex-col when chat is active
-                 // Always visible on md+ screens, hidden on mobile if chat is active
-                 // selectedChatTarget ? 'hidden md:block' : 'block'
+                selectedChatTarget ? 'w-full md:w-1/3 lg:w-1/4 flex flex-col' : 'w-full' // Adjust width and flex direction
             )}>
                 {/* Back button displayed when a team is selected or chat is active */}
                 {(selectedTeam || selectedChatTarget) && (
@@ -527,6 +560,7 @@ export default function TeamPage() {
                         users={users}
                         teams={teams}
                         onSelectUser={handleSelectUser}
+                        isChatActive={!!selectedChatTarget} // Pass chat state
                     />
                 )}
 
@@ -556,13 +590,14 @@ export default function TeamPage() {
                          )}
 
                          {/* Team Selected View: Show Team Members List */}
-                         {selectedTeam && ( // Show if team is selected, regardless of chat state
+                         {/* Only show members list if a team is selected */}
+                         {selectedTeam && (
                              <TeamMembersList
                                 team={selectedTeam}
                                 users={users}
                                 onSelectUser={handleSelectUser}
                                 onSelectTeamChat={handleSelectTeamChat}
-                               // Removed onBack prop as global back button handles this
+                                isChatActive={!!selectedChatTarget} // Pass chat state
                              />
                          )}
                      </>
