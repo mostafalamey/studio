@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -271,24 +270,41 @@ const TeamsManager: React.FC<{ users: AppUser[], teams: Team[] | undefined, team
 
 // Sub-component for managing user roles (Owner only)
 const RolesManager: React.FC<{ users: AppUser[], usersLoading: boolean, usersError: Error | undefined }> = ({ users, usersLoading, usersError }) => {
-    const { db } = useFirebase();
+    const { db, user: currentUser } = useFirebase(); // Get current user for self-check
     const { toast } = useToast();
     const [isSavingRole, setIsSavingRole] = useState<string | null>(null);
+    const [roleToChange, setRoleToChange] = useState<{ user: AppUser; newRole: UserRole } | null>(null);
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
-    const handleRoleChange = async (userId: string, newRole: UserRole) => {
-        if (!db) return;
-        setIsSavingRole(userId);
-        const userRef = doc(db, 'users', userId);
+    const handleRoleSelect = (userToUpdate: AppUser, newRole: UserRole) => {
+        if (!currentUser || userToUpdate.uid === currentUser.uid || userToUpdate.role === newRole) return; // Prevent changing own role or if role is same
+        setRoleToChange({ user: userToUpdate, newRole });
+        setIsConfirmModalOpen(true);
+    };
+
+    const closeConfirmModal = () => {
+        setIsConfirmModalOpen(false);
+        setRoleToChange(null);
+    };
+
+
+    const confirmRoleChange = async () => {
+        if (!db || !roleToChange) return;
+        setIsSavingRole(roleToChange.user.uid);
+        setIsConfirmModalOpen(false); // Close confirmation modal immediately
+        const userRef = doc(db, 'users', roleToChange.user.uid);
         try {
-            await updateDoc(userRef, { role: newRole });
-            toast({ title: "Role Updated", description: `User role updated successfully.` });
+            await updateDoc(userRef, { role: roleToChange.newRole });
+            toast({ title: "Role Updated", description: `${roleToChange.user.displayName || roleToChange.user.email}'s role updated to ${roleToChange.newRole}.` });
         } catch (error) {
             console.error("Error updating role:", error);
             toast({ title: "Error", description: "Failed to update user role.", variant: "destructive" });
         } finally {
             setIsSavingRole(null);
+            setRoleToChange(null); // Clear role change state
         }
     };
+
 
     if (usersLoading) {
         return (
@@ -313,40 +329,69 @@ const RolesManager: React.FC<{ users: AppUser[], usersLoading: boolean, usersErr
             <h2 className="text-2xl font-semibold">Manage User Roles</h2>
             <Card>
                 <CardContent className="pt-6 space-y-4">
-                    {users.map(user => (
-                        <div key={user.uid} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 border rounded-lg gap-4">
-                            <div>
-                                <p className="font-medium">{user.displayName || user.email}</p>
-                                <p className="text-sm text-muted-foreground">{user.email}</p>
+                    {users.map(user => {
+                         const isCurrentUser = currentUser?.uid === user.uid;
+                         return (
+                            <div key={user.uid} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 border rounded-lg gap-4">
+                                <div>
+                                    <p className="font-medium">{user.displayName || user.email}</p>
+                                    <p className="text-sm text-muted-foreground">{user.email}</p>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <Label htmlFor={`role-${user.uid}`} className="text-sm">Role:</Label>
+                                    <Select
+                                        value={user.role}
+                                        // Use the handler that opens the confirmation modal
+                                        onValueChange={(value) => handleRoleSelect(user, value as UserRole)}
+                                        disabled={isSavingRole === user.uid || isCurrentUser} // Disable select for current user and during save
+                                    >
+                                        <SelectTrigger id={`role-${user.uid}`} className="w-[150px]">
+                                            <SelectValue placeholder="Select role" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="employee">Employee</SelectItem>
+                                            <SelectItem value="manager">Manager</SelectItem>
+                                            <SelectItem value="owner">Owner</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    {isSavingRole === user.uid && <Badge variant="secondary">Saving...</Badge>}
+                                    {isCurrentUser && <Badge variant="outline">You</Badge>}
+                                </div>
                             </div>
-                            <div className="flex items-center space-x-2">
-                                <Label htmlFor={`role-${user.uid}`} className="text-sm">Role:</Label>
-                                <Select
-                                    value={user.role}
-                                    onValueChange={(value) => handleRoleChange(user.uid, value as UserRole)}
-                                    disabled={isSavingRole === user.uid || user.role === 'owner'}
-                                >
-                                    <SelectTrigger id={`role-${user.uid}`} className="w-[150px]">
-                                        <SelectValue placeholder="Select role" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="employee">Employee</SelectItem>
-                                        <SelectItem value="manager">Manager</SelectItem>
-                                        <SelectItem value="owner" disabled>Owner</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                {isSavingRole === user.uid && <Badge variant="secondary">Saving...</Badge>}
-                            </div>
-                        </div>
-                    ))}
+                        );
+                     })}
                 </CardContent>
             </Card>
+
+            {/* Confirmation Modal */}
+             <AlertDialog open={isConfirmModalOpen} onOpenChange={closeConfirmModal}>
+                 <AlertDialogContent>
+                     <AlertDialogHeader>
+                         <AlertDialogTitle>Confirm Role Change</AlertDialogTitle>
+                         <AlertDialogDescription>
+                             Are you sure you want to change
+                             <span className="font-semibold"> {roleToChange?.user.displayName || roleToChange?.user.email}'s </span> 
+                             role from <span className="font-semibold capitalize">{roleToChange?.user.role}</span> to
+                             <span className="font-semibold capitalize"> {roleToChange?.newRole}</span>?
+                         </AlertDialogDescription>
+                     </AlertDialogHeader>
+                     <AlertDialogFooter>
+                         <AlertDialogCancel onClick={closeConfirmModal} disabled={isSavingRole !== null}>Cancel</AlertDialogCancel>
+                         <AlertDialogAction
+                             onClick={confirmRoleChange}
+                             disabled={isSavingRole !== null}
+                         >
+                             {isSavingRole === roleToChange?.user.uid ? 'Confirming...' : 'Confirm'}
+                         </AlertDialogAction>
+                     </AlertDialogFooter>
+                 </AlertDialogContent>
+             </AlertDialog>
         </div>
     );
 };
 
 // Sub-component for displaying team members and initiating chat (Managers/Owners)
-const TeamMembersList: React.FC<{ team: Team, users: AppUser[], onSelectUser: (user: AppUser) => void, onSelectTeamChat: (team: Team) => void, isChatActive: boolean }> = ({ team, users, onSelectUser, onSelectTeamChat, isChatActive }) => {
+const TeamMembersList: React.FC<{ team: Team, users: AppUser[], onSelectUser: (user: AppUser) => void, onSelectTeamChat: (team: Team) => void, isChatActive: boolean, selectedChatTargetId: string | null }> = ({ team, users, onSelectUser, onSelectTeamChat, isChatActive, selectedChatTargetId }) => {
     const teamMembers = users.filter(user => team.members?.includes(user.uid));
 
     return (
@@ -355,7 +400,13 @@ const TeamMembersList: React.FC<{ team: Team, users: AppUser[], onSelectUser: (u
              <h2 className="text-2xl font-semibold">{team.name} Members</h2>
 
              {/* Card to initiate team chat */}
-             <Card className="hover:shadow-md transition-shadow cursor-pointer bg-border" onClick={() => onSelectTeamChat(team)}> {/* Changed to bg-border */}
+             <Card
+                 className={cn(
+                     "hover:shadow-md transition-shadow cursor-pointer bg-border",
+                     selectedChatTargetId === team.id && "ring-2 ring-primary" // Highlight if this team chat is active
+                 )}
+                 onClick={() => onSelectTeamChat(team)}
+             >
                  <CardHeader>
                      <CardTitle className="flex items-center justify-between text-base"> {/* Adjusted text size */}
                          Chat with "{team.name}" Team
@@ -370,7 +421,14 @@ const TeamMembersList: React.FC<{ team: Team, users: AppUser[], onSelectUser: (u
                 isChatActive ? "flex flex-col" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
             )}>
                 {teamMembers.map(member => (
-                    <Card key={member.uid} className="hover:shadow-md transition-shadow cursor-pointer bg-border" onClick={() => onSelectUser(member)}> {/* Changed to bg-border */}
+                    <Card
+                        key={member.uid}
+                        className={cn(
+                            "hover:shadow-md transition-shadow cursor-pointer bg-border",
+                             selectedChatTargetId === member.uid && "ring-2 ring-primary" // Highlight if this user chat is active
+                        )}
+                        onClick={() => onSelectUser(member)}
+                    >
                         <CardHeader>
                             <CardTitle className="flex items-center justify-between text-base truncate"> {/* Added truncate */}
                                 {member.displayName || member.email}
@@ -389,7 +447,7 @@ const TeamMembersList: React.FC<{ team: Team, users: AppUser[], onSelectUser: (u
 };
 
 // Sub-component for employees to see their teammates and initiate chat
-const EmployeeTeamView: React.FC<{ currentUser: AppUser, users: AppUser[], teams: Team[] | undefined, onSelectUser: (user: AppUser) => void, isChatActive: boolean }> = ({ currentUser, users, teams, onSelectUser, isChatActive }) => {
+const EmployeeTeamView: React.FC<{ currentUser: AppUser, users: AppUser[], teams: Team[] | undefined, onSelectUser: (user: AppUser) => void, isChatActive: boolean, selectedChatTargetId: string | null }> = ({ currentUser, users, teams, onSelectUser, isChatActive, selectedChatTargetId }) => {
     const [myTeam, setMyTeam] = useState<Team | null>(null);
     const [teammates, setTeammates] = useState<AppUser[]>([]);
 
@@ -422,7 +480,14 @@ const EmployeeTeamView: React.FC<{ currentUser: AppUser, users: AppUser[], teams
                  isChatActive ? "flex flex-col" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
              )}>
                 {teammates.map(member => (
-                    <Card key={member.uid} className="hover:shadow-md transition-shadow cursor-pointer bg-border" onClick={() => onSelectUser(member)}> {/* Changed to bg-border */}
+                    <Card
+                        key={member.uid}
+                        className={cn(
+                             "hover:shadow-md transition-shadow cursor-pointer bg-border",
+                             selectedChatTargetId === member.uid && "ring-2 ring-primary" // Highlight if this user chat is active
+                        )}
+                        onClick={() => onSelectUser(member)}
+                     >
                         <CardHeader>
                             <CardTitle className="flex items-center justify-between text-base truncate"> {/* Added truncate */}
                                 {member.displayName || member.email}
@@ -561,6 +626,7 @@ export default function TeamPage() {
                         teams={teams}
                         onSelectUser={handleSelectUser}
                         isChatActive={!!selectedChatTarget} // Pass chat state
+                        selectedChatTargetId={selectedChatTarget?.id || null} // Pass selected ID
                     />
                 )}
 
@@ -598,6 +664,7 @@ export default function TeamPage() {
                                 onSelectUser={handleSelectUser}
                                 onSelectTeamChat={handleSelectTeamChat}
                                 isChatActive={!!selectedChatTarget} // Pass chat state
+                                selectedChatTargetId={selectedChatTarget?.id || null} // Pass selected ID
                              />
                          )}
                      </>
