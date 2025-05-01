@@ -271,12 +271,13 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
   return (
      <Sidebar side="left" variant="sidebar" collapsible="icon" className="border-r border-sidebar-border">
         {/* Logo Area */}
-       <SidebarHeader className="items-center justify-center h-16 border-b border-sidebar-border">
-          <div className="flex flex-col items-center gap-1 p-2 overflow-hidden">
-               {/* Kept the existing simple SVG logo */}
-               <svg className="w-8 h-8 text-destructive group-data-[collapsible=icon]:w-6 group-data-[collapsible=icon]:h-6" data-ai-hint="logo wireless signal" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/><path d="M16.9999 8.5C16.9999 7.67 16.3299 7 15.4999 7C14.6699 7 13.9999 7.67 13.9999 8.5C13.9999 9.33 14.6699 10 15.4999 10C16.3299 10 16.9999 9.33 16.9999 8.5z"/><path d="M12 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 9c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/><path d="M7.00006 8.5C7.00006 7.67 6.33006 7 5.50006 7C4.67006 7 4.00006 7.67 4.00006 8.5C4.00006 9.33 4.67006 10 5.50006 10C6.33006 10 7.00006 9.33 7.00006 8.5z"/><path d="M12 14c-2.76 0-5 2.24-5 5h10c0-2.76-2.24-5-5-5z" opacity=".3"/><path d="M12 6c-3.31 0-6 2.69-6 6 0 1.84.83 3.5 2.15 4.61.5.42 1.21.4 1.7-.03.44-.4.46-1.1.04-1.54C8.99 14.19 8.5 13.17 8.5 12c0-1.93 1.57-3.5 3.5-3.5s3.5 1.57 3.5 3.5c0 1.17-.49 2.19-1.43 2.94-.42.44-.4 1.14.04 1.54.49.43 1.2.45 1.7.03C17.17 15.5 18 13.84 18 12c0-3.31-2.69-6-6-6z"/></svg>
-              <span className="font-bold text-primary text-sm group-data-[collapsible=icon]:hidden">ACS ProjectFlow</span>
-          </div>
+       <SidebarHeader className="flex items-center justify-center h-16 border-b border-sidebar-border">
+           {/* Changed layout to flex-row, added gap, removed overflow-hidden */}
+           <div className="flex items-center gap-2 p-2">
+                {/* Kept the existing simple SVG logo */}
+               <svg className="w-8 h-8 text-destructive group-data-[collapsible=icon]:w-6 group-data-[collapsible=icon]:h-6 flex-shrink-0" data-ai-hint="logo wireless signal" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/><path d="M16.9999 8.5C16.9999 7.67 16.3299 7 15.4999 7C14.6699 7 13.9999 7.67 13.9999 8.5C13.9999 9.33 14.6699 10 15.4999 10C16.3299 10 16.9999 9.33 16.9999 8.5z"/><path d="M12 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 9c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/><path d="M7.00006 8.5C7.00006 7.67 6.33006 7 5.50006 7C4.67006 7 4.00006 7.67 4.00006 8.5C4.00006 9.33 4.67006 10 5.50006 10C6.33006 10 7.00006 9.33 7.00006 8.5z"/><path d="M12 14c-2.76 0-5 2.24-5 5h10c0-2.76-2.24-5-5-5z" opacity=".3"/><path d="M12 6c-3.31 0-6 2.69-6 6 0 1.84.83 3.5 2.15 4.61.5.42 1.21.4 1.7-.03.44-.4.46-1.1.04-1.54C8.99 14.19 8.5 13.17 8.5 12c0-1.93 1.57-3.5 3.5-3.5s3.5 1.57 3.5 3.5c0 1.17-.49 2.19-1.43 2.94-.42.44-.4 1.14.04 1.54.49.43 1.2.45 1.7.03C17.17 15.5 18 13.84 18 12c0-3.31-2.69-6-6-6z"/></svg>
+               <span className="font-bold text-primary text-sm group-data-[collapsible=icon]:hidden whitespace-nowrap">ACS ProjectFlow</span>
+           </div>
        </SidebarHeader>
 
       <SidebarContent className="p-0">
