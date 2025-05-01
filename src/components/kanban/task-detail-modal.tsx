@@ -337,37 +337,37 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
     setIsDeleting(true);
     const taskRef = doc(db, 'tasks', task.id);
 
-    // TODO: Delete associated storage attachments if necessary
-    // This requires listing files in the storage folder and deleting them individually.
-    // const attachmentsFolderRef = ref(storage, `attachments/${task.projectId}/${task.id}`);
-    // Consider implementing this if orphaned files are a concern.
-
-    try {
-      // First delete attachments from storage
-      for (const attachment of attachments) {
-        try {
-          const attachmentRef = ref(storage, attachment.id);
-          await deleteObject(attachmentRef);
-          console.log(`Deleted attachment from storage: ${attachment.fileName}`);
-        } catch (storageError) {
-          // Log error but continue trying to delete the task doc
-          console.error(`Error deleting attachment ${attachment.fileName} from storage:`, storageError);
-          // Optionally notify user that specific attachment deletion failed
-          // toast({ title: "Attachment Deletion Warning", description: `Could not delete file ${attachment.fileName} from storage.`, variant: "default" });
+    // Delete associated storage attachments
+    for (const attachment of attachments) {
+      try {
+        const attachmentRef = ref(storage, attachment.id); // Assuming attachment.id is the full path
+        await deleteObject(attachmentRef);
+        console.log(`Deleted attachment from storage: ${attachment.fileName}`);
+      } catch (storageError: any) {
+        // Log error but continue trying to delete the task doc
+        // Don't stop the process if an attachment fails to delete (it might already be gone)
+        if (storageError.code !== 'storage/object-not-found') {
+             console.error(`Error deleting attachment ${attachment.fileName} from storage:`, storageError);
+            // Optionally notify user that specific attachment deletion failed
+             toast({ title: "Attachment Deletion Warning", description: `Could not delete file ${attachment.fileName} from storage. It might require manual removal.`, variant: "default" });
+        } else {
+            console.log(`Attachment ${attachment.fileName} not found in storage.`);
         }
       }
+    }
 
+    try {
       // Then delete the Firestore document
       await deleteDoc(taskRef);
 
       // TODO: Consider removing user from project's assignedUsers if this was their last task.
       // This is complex and might be better handled by a periodic cleanup function.
 
-      toast({ title: "Task Deleted", description: `Task "${task.name}" and its attachments were successfully deleted.` });
+      toast({ title: "Task Deleted", description: `Task "${task.name}" was successfully deleted.` });
       onClose(); // Close the modal after deletion
     } catch (error) {
-      console.error("Error deleting task:", error);
-      toast({ title: "Error", description: "Failed to delete task.", variant: "destructive" });
+      console.error("Error deleting task document:", error);
+      toast({ title: "Error", description: "Failed to delete task details.", variant: "destructive" });
     } finally {
       setIsDeleting(false);
     }
@@ -386,7 +386,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      {/* Removed DialogTitle from here as requested for accessibility fix in dialog.tsx */}
+      {/* DialogContent now has DialogTitle directly inside as requested */}
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
         <DialogHeader>
            {/* Input or Span for Title */}
@@ -403,7 +403,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
              </DialogTitle>
            ) : (
              <DialogTitle>
-                <span className="text-lg font-semibold">{task.name}</span>
+                {/* <span className="text-lg font-semibold">{task.name}</span> */}
+                {task.name} {/* Render directly for accessibility */}
              </DialogTitle>
            )}
           <DialogDescription>
@@ -625,3 +626,5 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
 };
 
 export default TaskDetailModal;
+
+    

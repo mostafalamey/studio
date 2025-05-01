@@ -17,11 +17,12 @@ import {
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { LogOut, FolderKanban, PlusCircle, LayoutDashboard, Users, FileText } from 'lucide-react'; // Added icons
+import { LogOut, FolderKanban, PlusCircle, LayoutDashboard, Users, FileText, MoreHorizontal, Trash2 } from 'lucide-react'; // Added MoreHorizontal, Trash2
 import { useFirebase } from '@/components/providers/firebase-provider';
 import { useCollectionData } from 'react-firebase-hooks/firestore';
-import { collection, query, orderBy, where, addDoc, Timestamp, FirestoreError, CollectionReference, Query, FieldPath, doc, setDoc } from 'firebase/firestore'; // Added FieldPath, doc, setDoc
-import type { Project, UserRole } from '@/lib/types';
+import { collection, query, orderBy, where, addDoc, Timestamp, FirestoreError, CollectionReference, Query, FieldPath, doc, setDoc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore'; // Added deleteDoc, getDocs, writeBatch
+import { getStorage, ref, deleteObject, listAll } from 'firebase/storage'; // Import storage functions
+import type { Project, UserRole, Task } from '@/lib/types'; // Added Task type
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -32,22 +33,44 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu"; // Import DropdownMenu components
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog" // Import AlertDialog components
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
-import { useProjectContext } from '@/components/providers/project-provider';
+import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton component
+import { Textarea } from "@/components/ui/textarea"; // Import Textarea
+import { useProjectContext } from '@/components/providers/project-provider'; // Import project context hook
 
 
 interface AppSidebarProps {}
 
 const AppSidebar: React.FC<AppSidebarProps> = () => {
   const { auth, user, userRole, db, loading: authLoading } = useFirebase();
+  const storage = getStorage(); // Initialize storage
   const { toast } = useToast();
   const [isAddingProject, setIsAddingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectDescription, setNewProjectDescription] = useState('');
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
+  const [isDeletingProject, setIsDeletingProject] = useState(false); // State for delete operation
+  const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const { selectedProjectId, setSelectedProjectId } = useProjectContext();
 
    // --- Project Fetching Logic ---
@@ -65,39 +88,35 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
                 } else if (userRole === 'employee') {
                     console.log(`Fetching projects for Employee: ${user.uid}`);
                     // Employees see projects where they are in the 'assignedUsers' array
+                    // This query requires a composite index: (assignedUsers Asc, createdAt Desc)
                     q = query(
                         projectsCollection,
-                        where('assignedUsers', 'array-contains', user.uid), // Ensure user.uid is correctly passed
+                        where('assignedUsers', 'array-contains', user.uid),
                         orderBy('createdAt', 'desc')
                     );
                  } else {
                      console.log(`Fetching projects for unknown/invalid role: ${userRole}`);
-                     // Handle cases where user role might not be set yet or is invalid
                      // Query for a non-existent document ID to return nothing
                      q = query(projectsCollection, where('__name__', '==', 'nonexistent'));
                  }
              } catch (error) {
                   console.error("Error constructing projects query:", error);
-                  // Optionally set query to null or a 'nonexistent' query on error
                   q = query(projectsCollection, where('__name__', '==', 'nonexistent'));
                   toast({
                       title: "Query Error",
-                      description: "Could not construct project query.",
+                      description: "Could not construct project query. Check Firestore indexes.",
                       variant: "destructive",
                   });
              }
              setProjectsQuery(q);
         } else if (db) {
             console.log("Fetching projects: No user logged in.");
-            // If db exists but user doesn't (e.g., logged out), show no projects
             const projectsCollection = collection(db, 'projects') as CollectionReference<Project>;
             setProjectsQuery(query(projectsCollection, where('__name__', '==', 'nonexistent')));
         } else {
              console.log("Fetching projects: DB not available.");
-             // If db doesn't exist (initial load?), set query to null
              setProjectsQuery(null);
         }
-     // Depend on db, user, and userRole changes
    }, [db, user, userRole, toast]);
 
 
@@ -118,11 +137,11 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
    useEffect(() => {
         if (projectsError) {
             console.error("Firestore Error fetching projects:", projectsError);
-            // Detailed toast for Firestore errors
             toast({
                 title: "Database Error",
-                description: `Failed to load projects: ${projectsError.message} (Code: ${projectsError.code})`,
+                description: `Failed to load projects: ${projectsError.message}. Ensure necessary Firestore indexes are created.`,
                 variant: "destructive",
+                 duration: 10000, // Show longer for index errors
             });
         }
     }, [projectsError, toast]);
@@ -134,32 +153,19 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
    // --- End Project Fetching Logic ---
 
 
-  const handleLogout = async () => {
-    if (!auth) return;
-    try {
-      await auth.signOut();
-      toast({ title: "Logged Out", description: "You have been successfully logged out." });
-      setSelectedProjectId(null); // Clear selected project on logout
-    } catch (error) {
-      console.error("Logout error:", error);
-      toast({ title: "Logout Failed", variant: "destructive" });
-    }
-  };
-
-   const handleAddProject = async () => {
+  const handleAddProject = async () => {
     if (!db || !newProjectName.trim() || !user) return;
     setIsAddingProject(true);
 
     try {
       const projectsCollection = collection(db, 'projects');
-      // Use doc() without an ID to get an auto-generated ID, then set()
-      const newProjectRef = doc(projectsCollection);
+      const newProjectRef = doc(projectsCollection); // Auto-generate ID
       await setDoc(newProjectRef, {
-        id: newProjectRef.id, // Store the generated ID within the document
+        id: newProjectRef.id, // Store generated ID in document
         name: newProjectName.trim(),
         description: newProjectDescription.trim() || '',
         createdAt: Timestamp.now(),
-        createdBy: user.uid, // Link project to the creator
+        createdBy: user.uid,
         assignedUsers: [], // Initialize with empty array
       });
       toast({ title: "Project Created", description: `"${newProjectName}" added successfully.` });
@@ -175,6 +181,86 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
     }
   };
 
+  const openDeleteConfirmation = (project: Project) => {
+    setProjectToDelete(project);
+    setIsDeleteConfirmationOpen(true);
+  };
+
+  const handleDeleteProject = async () => {
+    if (!db || !projectToDelete || (userRole !== 'manager' && userRole !== 'owner')) {
+        toast({ title: "Permission Denied", description: "You cannot delete this project.", variant: "destructive" });
+        setIsDeleteConfirmationOpen(false);
+        setProjectToDelete(null);
+        return;
+    }
+
+    setIsDeletingProject(true);
+    const projectId = projectToDelete.id;
+    const projectName = projectToDelete.name;
+
+    try {
+        const batch = writeBatch(db);
+
+        // 1. Query all tasks associated with the project
+        const tasksRef = collection(db, 'tasks');
+        const q = query(tasksRef, where('projectId', '==', projectId));
+        const tasksSnapshot = await getDocs(q);
+
+        // 2. Iterate through tasks to delete attachments and add task deletion to batch
+        for (const taskDoc of tasksSnapshot.docs) {
+            const task = taskDoc.data() as Task;
+            console.log(`Processing task ${taskDoc.id} for deletion`);
+
+            // Delete attachments from Storage
+            if (task.attachments && task.attachments.length > 0) {
+                for (const attachment of task.attachments) {
+                    try {
+                        const attachmentRef = ref(storage, attachment.id); // Assuming attachment.id is the storage path
+                        await deleteObject(attachmentRef);
+                        console.log(`Deleted attachment: ${attachment.fileName}`);
+                    } catch (storageError: any) {
+                         if (storageError.code !== 'storage/object-not-found') {
+                            console.error(`Error deleting attachment ${attachment.fileName} from storage:`, storageError);
+                            // Optionally warn user, but continue batch deletion
+                            toast({ title: "Attachment Deletion Warning", description: `Could not delete file ${attachment.fileName} from storage.`, variant: "default" });
+                         } else {
+                             console.log(`Attachment ${attachment.fileName} not found in storage (already deleted?).`);
+                         }
+                    }
+                }
+            }
+
+            // Add task deletion to the batch
+            batch.delete(taskDoc.ref);
+            console.log(`Added task ${taskDoc.id} to delete batch`);
+        }
+
+        // 3. Add project deletion to the batch
+        const projectRef = doc(db, 'projects', projectId);
+        batch.delete(projectRef);
+        console.log(`Added project ${projectId} to delete batch`);
+
+        // 4. Commit the batch
+        await batch.commit();
+        console.log(`Batch committed for project ${projectId} deletion.`);
+
+        toast({ title: "Project Deleted", description: `Project "${projectName}" and all its tasks/attachments were deleted.` });
+
+        // 5. Unselect project if it was selected
+        if (selectedProjectId === projectId) {
+            setSelectedProjectId(null);
+        }
+
+    } catch (error) {
+        console.error("Error deleting project and associated data:", error);
+        toast({ title: "Deletion Error", description: `Failed to delete project "${projectName}".`, variant: "destructive" });
+    } finally {
+        setIsDeletingProject(false);
+        setIsDeleteConfirmationOpen(false);
+        setProjectToDelete(null);
+    }
+};
+
 
   const getInitials = (name?: string | null) => {
     if (!name) return '?';
@@ -187,7 +273,6 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
         {/* Logo Area */}
        <SidebarHeader className="items-center justify-center h-16 border-b border-sidebar-border">
           <div className="flex flex-col items-center gap-1 p-2 overflow-hidden">
-              {/* Placeholder Logo SVG */}
                <svg className="w-8 h-8 text-destructive group-data-[collapsible=icon]:w-6 group-data-[collapsible=icon]:h-6" data-ai-hint="logo wireless signal" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/><path d="M16.9999 8.5C16.9999 7.67 16.3299 7 15.4999 7C14.6699 7 13.9999 7.67 13.9999 8.5C13.9999 9.33 14.6699 10 15.4999 10C16.3299 10 16.9999 9.33 16.9999 8.5z"/><path d="M12 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 9c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/><path d="M7.00006 8.5C7.00006 7.67 6.33006 7 5.50006 7C4.67006 7 4.00006 7.67 4.00006 8.5C4.00006 9.33 4.67006 10 5.50006 10C6.33006 10 7.00006 9.33 7.00006 8.5z"/><path d="M12 14c-2.76 0-5 2.24-5 5h10c0-2.76-2.24-5-5-5z" opacity=".3"/><path d="M12 6c-3.31 0-6 2.69-6 6 0 1.84.83 3.5 2.15 4.61.5.42 1.21.4 1.7-.03.44-.4.46-1.1.04-1.54C8.99 14.19 8.5 13.17 8.5 12c0-1.93 1.57-3.5 3.5-3.5s3.5 1.57 3.5 3.5c0 1.17-.49 2.19-1.43 2.94-.42.44-.4 1.14.04 1.54.49.43 1.2.45 1.7.03C17.17 15.5 18 13.84 18 12c0-3.31-2.69-6-6-6z"/></svg>
               <span className="font-bold text-primary text-sm group-data-[collapsible=icon]:hidden">ACS PM</span>
           </div>
@@ -201,10 +286,9 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
              {(userRole === 'manager' || userRole === 'owner') && (
                <Dialog open={isAddProjectModalOpen} onOpenChange={setIsAddProjectModalOpen}>
                  <DialogTrigger asChild>
-                   {/* Replaced with simpler button for consistency, can be styled further */}
                     <Button
-                       variant="default" // Changed to default for prominence like image
-                       className="w-full justify-center h-9 mb-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0 bg-destructive hover:bg-destructive/90 text-destructive-foreground" // Red button like image
+                       variant="default"
+                       className="w-full justify-center h-9 mb-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0 bg-destructive hover:bg-destructive/90 text-destructive-foreground"
                        title="Add Project"
                      >
                      <PlusCircle className="w-4 h-4 mr-2 group-data-[collapsible=icon]:mr-0" />
@@ -254,26 +338,55 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
                     [1, 2].map(i => <SidebarMenuSkeleton key={`skel-proj-${i}`} showIcon />)
                  ) : projectsError ? (
                      <p key="proj-error" className="text-xs text-destructive px-2">
-                          Error loading projects. Check console for details.
+                          Error loading projects. Check console & indexes.
                      </p>
                  ) : !projects || projects.length === 0 ? (
                      <p key="proj-empty" className="text-xs text-muted-foreground px-2 italic">
-                          {userRole === 'manager' || userRole === 'owner' ? 'No projects yet. Add one!' : 'No projects found or assigned.'}
+                          {userRole === 'manager' || userRole === 'owner' ? 'No projects yet. Add one!' : 'No projects assigned.'}
                      </p>
                  ) : (
                      // Project list
                      projects.map((project) => (
                          <SidebarMenuItem key={project.id}> {/* Use project.id as key */}
+                            <div className="flex items-center w-full">
                              <SidebarMenuButton
                                  onClick={() => handleSelectProject(project.id)}
                                  isActive={selectedProjectId === project.id} // Use context state for isActive
                                  tooltip={{ children: project.name }} // Show tooltip when collapsed
-                                 className="justify-start group-data-[collapsible=icon]:justify-center"
+                                 className="justify-start group-data-[collapsible=icon]:justify-center flex-grow" // Use flex-grow
                              >
-                                 {/* Using FolderKanban, but could be FileText based on image */}
                                  <FolderKanban className="flex-shrink-0" />
                                  <span className="truncate">{project.name}</span>
                              </SidebarMenuButton>
+
+                             {/* Three Dots Menu for Delete (Managers/Owners only) */}
+                              {(userRole === 'manager' || userRole === 'owner') && (
+                                 <DropdownMenu>
+                                     <DropdownMenuTrigger asChild>
+                                         <Button
+                                             variant="ghost"
+                                             size="icon"
+                                             className="h-8 w-8 ml-auto flex-shrink-0 group-data-[collapsible=icon]:hidden"
+                                             title="Project Actions"
+                                             onClick={(e) => e.stopPropagation()} // Prevent triggering project selection
+                                         >
+                                             <MoreHorizontal className="w-4 h-4" />
+                                             <span className="sr-only">Project Actions</span>
+                                         </Button>
+                                     </DropdownMenuTrigger>
+                                     <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                         <DropdownMenuItem
+                                             className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                             onClick={() => openDeleteConfirmation(project)}
+                                             disabled={isDeletingProject}
+                                         >
+                                             <Trash2 className="mr-2 h-4 w-4" />
+                                             <span>Delete Project</span>
+                                         </DropdownMenuItem>
+                                     </DropdownMenuContent>
+                                 </DropdownMenu>
+                              )}
+                              </div>
                          </SidebarMenuItem>
                      ))
                  )}
@@ -286,8 +399,7 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
              <SidebarMenu>
                  <SidebarMenuItem key="dashboard">
                       <SidebarMenuButton
-                          // onClick={() => { /* Navigate to Dashboard view */ }}
-                          isActive={false} // Determine active state based on current route/view
+                          isActive={false}
                           tooltip={{ children: "Dashboard" }}
                           className="justify-start group-data-[collapsible=icon]:justify-center"
                           disabled // Disable for now
@@ -298,8 +410,7 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
                   </SidebarMenuItem>
                    <SidebarMenuItem key="team">
                       <SidebarMenuButton
-                          // onClick={() => { /* Navigate to Team view */ }}
-                          isActive={false} // Determine active state based on current route/view
+                          isActive={false}
                           tooltip={{ children: "Team" }}
                           className="justify-start group-data-[collapsible=icon]:justify-center"
                           disabled // Disable for now
@@ -314,10 +425,39 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
 
        {/* Footer - Removed User Info and Logout */}
       <SidebarFooter className="p-2 mt-auto border-t border-sidebar-border">
-         {/* Content removed as per request */}
+         {/* Content removed */}
       </SidebarFooter>
+
+        {/* Delete Project Confirmation Dialog */}
+         {projectToDelete && (
+            <AlertDialog open={isDeleteConfirmationOpen} onOpenChange={setIsDeleteConfirmationOpen}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete the project
+                      <span className="font-semibold"> "{projectToDelete.name}" </span>
+                       and all associated tasks and attachments.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isDeletingProject} onClick={() => { setProjectToDelete(null); setIsDeleteConfirmationOpen(false); }}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                       onClick={handleDeleteProject}
+                       disabled={isDeletingProject}
+                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90" // Ensure destructive style
+                     >
+                      {isDeletingProject ? 'Deleting...' : 'Delete Project'}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+         )}
+
     </Sidebar>
   );
 };
 
 export default AppSidebar;
+
+    
