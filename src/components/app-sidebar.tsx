@@ -271,7 +271,7 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
   return (
      <Sidebar side="left" variant="sidebar" collapsible="icon" className="border-r border-sidebar-border">
         {/* Logo Area */}
-        <SidebarHeader className="flex items-center justify-center h-24 border-b border-sidebar-border p-4"> {/* Increased height and padding */}
+        <SidebarHeader className="flex items-center justify-center h-24 border-b border-sidebar-border px-4 py-6"> {/* Increased top/bottom padding */}
            {/* Container for logo and text, stacked vertically */}
            <div className="flex flex-col items-center gap-2"> {/* Use flex-col and items-center */}
                 {/* Logo */}
@@ -473,4 +473,5 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
 
 export default AppSidebar;
 
+    
     
