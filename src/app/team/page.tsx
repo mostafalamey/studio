@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { AppUser, UserRole, Team } from '@/lib/types';
 import { PlusCircle, Trash2, Edit, Users, UserPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import Login from '@/components/auth/login'; // Import the Login component
 
 // Sub-component for displaying and managing teams
 const TeamsManager: React.FC<{ users: AppUser[], teams: Team[] | undefined, teamsLoading: boolean, teamsError: Error | undefined }> = ({ users, teams, teamsLoading, teamsError }) => {
@@ -360,7 +361,7 @@ export default function TeamPage() {
     const teamsQuery = db ? query(collection(db, 'teams') as CollectionReference<Team>, orderBy('name')) : null;
     const [teams, teamsLoading, teamsError] = useCollectionData<Team>(teamsQuery, { idField: 'id' });
 
-    if (authLoading || !userRole) {
+    if (authLoading) { // Only check authLoading initially
         return (
             <div className="p-6 space-y-6">
                 <Skeleton className="h-8 w-1/2" />
@@ -372,7 +373,12 @@ export default function TeamPage() {
         );
     }
 
-    // Employees cannot access this page directly
+    // After authLoading is false, check if the user is authenticated
+    if (!user) {
+        return <Login />;
+    }
+
+    // If user is authenticated, check role for access control
     if (userRole === 'employee') {
         return (
             <div className="p-6 text-center">
@@ -382,7 +388,7 @@ export default function TeamPage() {
         );
     }
 
-    // Render content based on role
+    // If user is manager or owner, render the content
     return (
         <div className="p-4 md:p-6 space-y-8">
             <h1 className="text-3xl font-bold">Team Management</h1>
